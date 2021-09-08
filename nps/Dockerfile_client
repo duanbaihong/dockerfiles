@@ -1,0 +1,20 @@
+FROM alpine:3.13
+MAINTAINER dbh888<duanbaihong@qq.com>
+
+ENV NPS_VERSION=0.26.10 \
+    NPS_PREFIX=/opt/nps \
+    NPS_RUNUSER=nps \
+    NPS_RUNUSERID=1000 \
+    NPS_TYPE=Client
+ADD entrypoint.sh init_nps /bin/
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add su-exec libcap dumb-init bash \
+    && mkdir ${NPS_PREFIX}/logs -p \
+    && wget -c https://github.com/cnlh/nps/releases/download/v${NPS_VERSION}/linux_amd64_client.tar.gz -O -|tar -xzv -C "${NPS_PREFIX}" \
+    && cd ${NPS_PREFIX} \
+    && rm -rf /var/cache/apk/* 
+
+VOLUME ["${NPS_PREFIX}/conf"]
+EXPOSE 8080
+WORKDIR ${NPS_PREFIX}
+ENTRYPOINT ["/bin/entrypoint.sh"]

@@ -1,0 +1,93 @@
+#/bin/sh
+
+function printOK() {
+  if [ $1 -ne 0 ]; then
+    echo -e "[\033[33mFailed\033[0m]"
+  else
+    echo -e "[\033[32m  OK  \033[0m]"
+  fi
+}
+function formatOutput() {
+  width=120
+  str=""
+  arg=$1
+  if [ "$arg" == "title" ]; then
+    for i in `seq 1 $(expr $width + 8)`
+    do
+      str="${str}#"
+    done
+    echo $str
+    return 0
+  fi
+  reparg=`echo $arg|sed 's|\\\033\[[0-9]*m||g'`
+  if [ -n "$2" ]; then
+    reparg2=`echo $2|sed 's|\\\033\[[0-9]*m||g'`
+    argLen=$(expr ${width} - ${#reparg} - ${#reparg2} + 6)
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -e "\033[36m$1$tab$2\033[0m"
+    return 0
+  else
+    argLen=$(expr ${width} - ${#reparg})
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -en "$arg$tab"
+  fi
+}
+
+# 生成配置文件
+function initConfig(){
+  formatOutput title
+  if [ ! -f "${DNSMASQ_PREFIX}/etc/dnsmasq.conf" ]; then
+    IP_DEVICE=$(ip route | grep default|awk '{print $5}')
+    DNSMASQ_ADDR=$(ip -o -4 addr list ${IP_DEVICE} | head -n1 | awk '{print $4}' | cut -d/ -f1)
+    formatOutput "Generate dnsmasq configuration files [dnsmasq.conf]..."
+     cat <<EOF>${DNSMASQ_PREFIX}/etc/dnsmasq.conf
+resolv-file=${DNSMASQ_PREFIX}/etc/resolv.conf
+strict-order
+addn-hosts=${DNSMASQ_PREFIX}/etc/dnsmasq.hosts
+#hostsdir=${DNSMASQ_PREFIX}/etc/dnsmasq.hosts.d
+listen-address=${DNSMASQ_ADDR}
+no-daemon
+log-queries
+log-async=50
+localise-queries
+EOF
+    printOK $?
+    formatOutput "Generate dnsmasq configuration files [dnsmasq.hosts]..."
+    cat <<EOF>${DNSMASQ_PREFIX}/etc/dnsmasq.hosts
+#/etc/hosts example
+
+EOF
+    printOK $?
+
+  fi
+  if [ ! -f "${DNSMASQ_PREFIX}/etc/resolv.conf" ]; then
+    ln -sf /etc/resolv.conf ${DNSMASQ_PREFIX}/etc/resolv.conf
+  fi
+  id ${DNSMASQ_RUNUSER} &>/dev/null 2>&1
+  if [ $? -ne 0 ]; then
+      #statements
+      adduser -D -H -s /sbin/nologin -u ${DNSMASQ_RUNUSERID} ${DNSMASQ_RUNUSER} >& /dev/null;
+      formatOutput "Repair user directory permissions...."
+      chown ${DNSMASQ_RUNUSER}.${DNSMASQ_RUNUSER} ${DNSMASQ_PREFIX}/etc ${DNSMASQ_PREFIX}/sbin  -R
+      printOK $?
+      /usr/sbin/setcap "cap_net_bind_service=+ep" ${DNSMASQ_PREFIX}/sbin/dnsmasq
+      formatOutput title
+  fi
+  WEBPROC_USERARGS=''
+  if [ ! -f "${DNSMASQ_PREFIX}/etc/webproc_user" ]; then
+    generatePassword=`< /dev/urandom tr -dc A-Za-z0-9|head -c ${1:-12}`
+    formatOutput "Generate WEBPROC administrative User [${WEBPROC_USER}] password: ${generatePassword}"
+    echo -e "HTTP_USER=${WEBPROC_USER}\nHTTP_PASS=${generatePassword}" >${DNSMASQ_PREFIX}/etc/webproc_user
+    printOK $?
+  fi
+  . ${DNSMASQ_PREFIX}/etc/webproc_user
+  WEBPROC_USERARGS="-u ${HTTP_USER}"
+}

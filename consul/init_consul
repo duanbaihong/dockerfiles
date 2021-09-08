@@ -1,0 +1,199 @@
+#!/bin/sh
+
+function printOK() {
+  if [ $1 -ne 0 ]; then
+    echo -e "[\033[33mFailed\033[0m]"
+  else
+    echo -e "[\033[32m  OK  \033[0m]"
+  fi
+}
+function formatOutput() {
+  width=110
+  str=""
+  arg=$1
+  if [ "$arg" == "title" ]; then
+    for i in `seq 1 $(expr $width + 8)`
+    do
+      str="${str}#"
+    done
+    echo $str
+    return 0
+  fi
+  reparg=`echo $arg|sed 's|\\\033\[[0-9]*m||g'`
+  if [ -n "$2" ]; then
+    reparg2=`echo $2|sed 's|\\\033\[[0-9]*m||g'`
+    argLen=$(expr ${width} - ${#reparg} - ${#reparg2} + 6)
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -e "\033[36m$1$tab$2\033[0m"
+    return 0
+  else
+    argLen=$(expr ${width} - ${#reparg})
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -en "$arg$tab"
+  fi
+}
+function CreatCerts() {
+    formatOutput "title" 
+    if [ ! -n "$CONSUL_DOMAIN" ]; then
+      CONSUL_DOMAIN=${CONSUL_ADVERTISE}
+    fi
+    SUBJECT="/C=CN/ST=CQ/L=YUZHONGQU/O=OPS_WBD/OU=WBD_CONSUL_DC/emailAddress=duanbaihong@qq.com/CN=${CONSUL_DOMAIN}"
+    echo -e "Generate certificate files,And enable local listen SSL/TSL ...."
+    if [ ! -f "${CONSUL_CONFIG_DIR}/certs/ca/ca.crt" ]; then
+      formatOutput "Generating CA Certificates to [${CONSUL_CONFIG_DIR}/certs/ca/]..."
+      mkdir -p ${CONSUL_CONFIG_DIR}/certs/ca ${CONSUL_CONFIG_DIR}/certs/server ${CONSUL_CONFIG_DIR}/certs/client >/dev/null 2>&1 
+      openssl genrsa -out ${CONSUL_CONFIG_DIR}/certs/ca/ca.key 2048 >/dev/null 2>&1 
+      openssl req -new -x509 -days 3650 -subj $SUBJECT -key ${CONSUL_CONFIG_DIR}/certs/ca/ca.key -out ${CONSUL_CONFIG_DIR}/certs/ca/ca.crt  
+      printOK $?
+    fi
+    formatOutput "Generating Server Certificates to [${CONSUL_CONFIG_DIR}/certs/server/]..."
+    mkdir -p /demoCA/newcerts
+    touch /demoCA/index.txt.attr /demoCA/index.txt /demoCA/serial
+    echo 01 >/demoCA/serial
+    openssl genrsa -out ${CONSUL_CONFIG_DIR}/certs/server/server.key 2048 >/dev/null 2>&1
+    openssl req -new -days 3650 -subj $SUBJECT -key ${CONSUL_CONFIG_DIR}/certs/server/server.key -out ${CONSUL_CONFIG_DIR}/certs/server/server.csr >/dev/null 2>&1
+    yes|head -2|openssl ca -days 3650 -in ${CONSUL_CONFIG_DIR}/certs/server/server.csr -out ${CONSUL_CONFIG_DIR}/certs/server/server.crt -cert ${CONSUL_CONFIG_DIR}/certs/ca/ca.crt -keyfile ${CONSUL_CONFIG_DIR}/certs/ca/ca.key >/dev/null 2>&1
+    printOK $?
+    rm -rf /demoCA
+    formatOutput "Generating Client Certificates to [${CONSUL_CONFIG_DIR}/certs/client/]..."
+    mkdir -p /demoCA/newcerts
+    touch /demoCA/index.txt.attr /demoCA/index.txt /demoCA/serial
+    echo 01 >/demoCA/serial
+    openssl genrsa -out ${CONSUL_CONFIG_DIR}/certs/client/client.key 2048 >/dev/null 2>&1
+    openssl req -new -days 3650 -subj $SUBJECT -key ${CONSUL_CONFIG_DIR}/certs/client/client.key -out ${CONSUL_CONFIG_DIR}/certs/client/client.csr
+    yes|head -2|openssl ca -days 3650 -in ${CONSUL_CONFIG_DIR}/certs/client/client.csr -out ${CONSUL_CONFIG_DIR}/certs/client/client.crt -cert ${CONSUL_CONFIG_DIR}/certs/ca/ca.crt -keyfile ${CONSUL_CONFIG_DIR}/certs/ca/ca.key >/dev/null 2>&1 
+    printOK $?
+    rm -rf /demoCA
+    formatOutput title
+}
+function enable_prometheus_metric(){
+  formatOutput "Prometheus monitoring metrics with Consul enable,Service file to [${CONSUL_CONFIG_DIR}/config/metrics.json]..."
+  cat <<EOF>${CONSUL_CONFIG_DIR}/config/metrics.json
+  {
+    "service":{
+      "id": "prometheus-metrics",
+      "name": "prometheus-metrics",
+      "address": "${CONSUL_ADVERTISE}",
+      "port": 8500,
+      "tags": ["prometheus_metrics","运维监控使用"],
+      "checks": [
+          {
+              "tcp": "127.0.0.1:8500",
+              "interval": "60s"
+          }
+      ]
+    }
+  }
+EOF
+  printOK $?
+}
+# 生成配置文件
+function initConfig(){
+  if [ ! -n "${CONSUL_BIND_ADDR}" ]; then
+    CONSUL_BIND_ADDR=$(ip -o -4 addr list ${IP_DEVICE} | head -n1 | awk '{print $4}' | cut -d/ -f1)
+  fi
+  if [ ! -n "${CONSUL_ADVERTISE}" ]; then
+    CONSUL_ADVERTISE=$(ip -o -4 addr list ${IP_DEVICE} | head -n1 | awk '{print $4}' | cut -d/ -f1)
+  fi
+  if [ ! -n "${CONSUL_ADVERTISE_WAN}" ]; then
+    CONSUL_ADVERTISE_WAN=${CONSUL_ADVERTISE}
+  fi
+  CONSUL_HTTP_SSL_CONFIG=""
+  if [ "${CONSUL_HTTP_SSL}" == "true" ] && [ "${CONSUL_HTTPS_PORT}" != "" ]; then
+    if [ "${CONSUL_HTTPS_PORT}" == "-1" ]; then
+      CONSUL_HTTPS_PORT=8501
+    fi
+    CreatCerts
+    CONSUL_SSL_CA=""
+    if [ "${CONSUL_ALL_SSL}" == "true" ]; then
+      CONSUL_SSL_CA=",\n\x20\x20\x20\x20\"ca_file\": \"${CONSUL_CONFIG_DIR}/certs/ca/ca.crt\""
+    fi
+    CONSUL_HTTP_SSL_CONFIG="${CONSUL_SSL_CA},\n\
+    \x20\x20\x20\"key_file\": \"${CONSUL_CONFIG_DIR}/certs/server/server.key\",\n\
+    \x20\x20\x20\"cert_file\": \"${CONSUL_CONFIG_DIR}/certs/server/server.crt\""
+  fi
+    #statements
+  CONSUL_SERVER_ARGS=""
+  CONSUL_TOKEN_ARGS="\"agent\": \"${CONSUL_AGENT_TOKEN}\",\n\
+  \x20\x20\x20\x20\x20\x20\x20\"default\": \"${CONSUL_DEFAULT_TOKEN}\""
+  if [ "$CONSUL_SERVER" == "true" ]; then
+    if [ "$CONSUL_BOOTSTRAP" == "true" ]; then
+      CONSUL_SERVER_ARGS="\"server\": ${CONSUL_SERVER},\n\
+      \x20\x20\x20\"bootstrap\": ${CONSUL_BOOTSTRAP},\n\
+      \x20\x20\x20\"primary_datacenter\": \"${CONSUL_DATACENTER}\","
+    else
+      CONSUL_SERVER_ARGS="\"server\": ${CONSUL_SERVER},\n\
+      \x20\x20\x20\"bootstrap_expect\": ${CONSUL_BOOTSTRAP_EXPECT},\n\
+      \x20\x20\x20\"primary_datacenter\": \"${CONSUL_DATACENTER}\","
+    fi
+    if [ -n "$CONSUL_MASTER_TOKEN"]; then
+      formatOutput "Not find master token value,now generate a master token...."
+      CONSUL_MASTER_TOKEN=$(cat /proc/sys/kernel/random/uuid)
+      printOK $?
+    fi
+    formatOutput "Please remember this Master token [\033[31m${CONSUL_MASTER_TOKEN}\033[0m],It's use manager consul..."
+    printOK $?
+    CONSUL_TOKEN_ARGS="\"master\": \"${CONSUL_MASTER_TOKEN}\",\n\
+    \x20\x20\x20\x20\x20\x20\x20${CONSUL_TOKEN_ARGS}"
+  fi
+  if [ "${CONSUL_ENABLE_PROMETHEUS}" == "true" ]; then
+    #statements
+    CONSUL_SERVER_ARGS="${CONSUL_SERVER_ARGS}${CONSUL_SERVER_ARGS:+\\n}\x20\x20\x20\x20\"telemetry\": {\n\
+        \x20\x20\x20\x20\x20\x20\x20\"prometheus_retention_time\": \"30s\",\n\
+        \x20\x20\x20\x20\x20\x20\x20\"disable_hostname\": true\n\
+        \x20\x20\x20},"
+    enable_prometheus_metric
+  fi
+  cat <<EOF >${CONSUL_CONFIG_DIR}/consul.json
+  {
+    "datacenter": "${CONSUL_DATACENTER}",
+    "data_dir": "${CONSUL_CONFIG_DIR}/data",
+    "node_name": "$(echo $RANDOM|openssl md5|awk '{print $2}'|head -c10)-${CONSUL_ADVERTISE//./}",
+    "log_level": "${CONSUL_LOG_LEVEL}",
+    "bind_addr": "${CONSUL_BIND_ADDR}",
+    "client_addr": "${CONSUL_CLIENT}",
+    `echo -e ${CONSUL_SERVER_ARGS}`
+    "retry_join": ["${CONSUL_RETRY_JOIN//,/\",\"}"],
+    "ui": ${CONSUL_UI},
+    "ui_dir": "${CONSUL_UI_DIR}",
+    "encrypt": "${CONSUL_ENCRYPT}",
+    "advertise_addr": "${CONSUL_ADVERTISE}",
+    "advertise_addr_wan": "${CONSUL_ADVERTISE_WAN}",
+    "leave_on_terminate": ${CONSUL_LEAVE_ON_TERMINATE},
+    "disable_update_check": true,
+    "enable_script_checks": true,
+    "addresses": {
+      "dns": "${CONSUL_CLIENT}",
+      "http": "${CONSUL_CLIENT}",
+      "https": "${CONSUL_CLIENT}",
+      "grpc": "${CONSUL_CLIENT}"
+    },  
+    "ports": {
+      "dns": ${CONSUL_DNS_PORT},
+      "http": ${CONSUL_HTTP_PORT},
+      "https": ${CONSUL_HTTPS_PORT},
+      "grpc": ${CONSUL_GRPC_PORT},
+      "serf_lan": ${CONSUL_SERF_LAN_PORT},
+      "serf_wan": ${CONSUL_SERF_WAN_PORT},
+      "server": ${CONSUL_SERVER_PORT}
+    },
+    "acl": {
+      "enabled": ${CONSUL_ACL_ENABLE},
+      "default_policy": "deny",
+      "down_policy": "extend-cache",
+      "tokens": {
+        `echo -e ${CONSUL_TOKEN_ARGS}`
+      }
+    }`echo -e ${CONSUL_HTTP_SSL_CONFIG}`
+  }
+EOF
+sed -i 's/\\//g' ${CONSUL_CONFIG_DIR}/consul.json
+}

@@ -1,0 +1,175 @@
+#/bin/sh
+
+MYSQLD=${MYSQL_PREFIX}/bin/mysqld
+MYSQLADMIN=${MYSQL_PREFIX}/bin/mysqladmin
+MYSQLCONFIG=${MYSQL_PREFIX}/etc/mysqld.cnf
+
+function printOK() {
+  if [ $1 -ne 0 ]; then
+    echo -e "[\033[33mFailed\033[0m]"
+  else
+    echo -e "[\033[32m  OK  \033[0m]"
+  fi
+}
+function sleepinit(){
+  sleep 60
+  LOCAL_PASSWORD=$(cat ${MYSQL_PREFIX}/logs/init_mysql.log|grep 'A temporary password is generated for'|grep -o 'root@localhost: .*'|awk -F': ' '{print $2}')
+  if [ ! -n "${MYSQL_PASSWORD}" ]; then
+    MYSQL_PASSWORD=${LOCAL_PASSWORD}
+  fi
+  ${MYSQLADMIN} -uroot -p${LOCAL_PASSWORD} password "${MYSQL_PASSWORD}"
+  sed -i "s|${LOCAL_PASSWORD}|${MYSQL_PASSWORD}|g" ${MYSQL_PREFIX}/logs/init_mysql.log
+  sed -i "s|@@LOCAL_PASSWORD@@|$MYSQL_PASSWORD|g" ${MYSQL_PREFIX}/etc/mysqld.cnf
+  cat ${MYSQL_PREFIX}/logs/init_mysql.log
+  formatOutput "Create management user [\033[31madmin\033[0m] for security free monitoring..."
+  echo "create user 'admin'@'localhost' identified by '${MYSQL_PASSWORD}';grant all privileges on *.* to 'admin'@'localhost';flush privileges;"|mysql -uroot -p${MYSQL_PASSWORD} 2>/dev/null
+  printOK $?
+}
+function formatOutput() {
+  width=120
+  str=""
+  arg=$1
+  if [ "$arg" == "title" ]; then
+    for i in `seq 1 $(expr $width + 8)`
+    do
+      str="${str}#"
+    done
+    echo $str
+    return 0
+  fi
+  reparg=`echo $arg|sed 's|\\\033\[[0-9]*m||g'`
+  if [ -n "$2" ]; then
+    reparg2=`echo $2|sed 's|\\\033\[[0-9]*m||g'`
+    argLen=$(expr ${width} - ${#reparg} - ${#reparg2} + 6)
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -e "\033[36m$1$tab$2\033[0m"
+    return 0
+  else
+    argLen=$(expr ${width} - ${#reparg})
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -en "$arg$tab"
+  fi
+}
+# 生成配置文件
+function initConfig(){
+  if [ ! -s "${MYSQLCONFIG}" ]; then
+    #statements
+    formatOutput "Initial configuration file [\033[31m${MYSQL_PREFIX}/etc/mysqld.cnf\033[0m]"
+    cat <<EOF>${MYSQLCONFIG}
+[mysql]
+
+[mysqld]
+
+user                           = ${MYSQL_USER}
+skip-host-cache
+skip-name-resolve
+gtid_mode                      = ON
+enforce-gtid-consistency       = ON 
+datadir                        = ${MYSQL_PREFIX}/data
+
+
+# bin log 设置段
+binlog_format                  = ROW
+log_bin                        = ${MYSQL_PREFIX}/binlog/mysql-bin.log
+# 15 天
+binlog_expire_logs_seconds     = 1296000 
+binlog_cache_size              = 4m
+max_binlog_cache_size          = 256m
+max_binlog_size                = 100m
+max_connections                = 3000
+
+#master-slave#
+server-id                      = $(hostname -i|awk -F'.' '{print $4}')
+# binlog-do-db                  = platform
+# binlog-ignore-db              = mysql
+# replicate-do-db               = platform
+# replicate-ignore-db           = mysql
+# slave-skip-errors             = 1062
+# replicate-wild-ignore-table   = xxxx.%
+# replicate_wild_do_table       = xxxx.%
+relay-log-purge                = 1
+relay-log-recovery             = 1
+
+master_info_repository         = table
+relay_log_info_repository      = table
+slave-parallel-type            = LOGICAL_CLOCK
+slave-parallel-workers         = 8
+log-slave-updates              = 1 
+
+###buffer-pool###
+join_buffer_size               = 64M
+sort_buffer_size               = 16M
+myisam_sort_buffer_size        = 32M
+thread_cache_size              = 32
+#thread_concurrency             = 8
+tmp_table_size                 = 128M
+read_rnd_buffer_size           = 2M
+log_bin_trust_function_creators= 1
+
+#InnoDB#
+innodb_buffer_pool_size        = 1G
+innodb_log_file_size           = 64M
+innodb_file_per_table          = 1
+innodb_flush_method            = O_DIRECT
+
+### Enable slow_query_log permanent ###
+slow-query-log                 = 1
+long_query_time                = 1
+
+# # mysql8 audit log
+# audit-log-strategy
+
+# 默认使用“mysql_native_password”插件认证
+default_authentication_plugin = mysql_native_password
+
+[mysqldump]
+quick
+quote-names
+max_allowed_packet            = 16M
+
+
+[mysqladmin]
+user                          = admin
+password                      = @@LOCAL_PASSWORD@@
+
+[client]
+socket                        = ${MYSQL_PREFIX}/run/mysql.sock
+port                          = 3306
+
+EOF
+  cat <<EOF>/etc/logrotate.d/mysqld
+${MYSQL_PREFIX}/logs/*.log {
+    create 600 ${MYSQL_USER} ${MYSQL_USER}
+    notifempty
+    daily
+    rotate 5
+    missingok
+    compress
+    postrotate
+      # just if mysqld is really running
+      if test -x ${MYSQLADMIN} &&\
+        ${MYSQLADMIN} --defaults-file=${MYSQLCONFIG} ping &>/dev/null
+      then
+        ${MYSQLADMIN} --defaults-file=${MYSQLCONFIG} flush-logs
+      fi
+    endscript
+}
+EOF
+  printOK $?
+    # 初始数据库。。。initialize
+    if [ "`ls -A ${MYSQL_PREFIX}/data`" = "" ]; then 
+      formatOutput "Initial MySQL database data..."
+      ${MYSQLD} --defaults-file=${MYSQL_PREFIX}/etc/mysqld.cnf --initialize --user=${MYSQL_USER} --datadir=${MYSQL_PREFIX}/data 2>${MYSQL_PREFIX}/logs/init_mysql.log
+      printOK $?
+      sleepinit &
+    fi
+  fi
+}

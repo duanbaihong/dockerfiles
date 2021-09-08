@@ -1,0 +1,28 @@
+FROM alpine:3.13 as build-go
+MAINTAINER dbh888<duanbaihong@qq.com>
+
+
+ADD peer-finder-patch.diff /tmp/
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add go upx git patch\
+    && cd / \
+    && git clone https://github.com.cnpmjs.org/kmodules/peer-finder.git \
+    && cd peer-finder \
+    && patch -p1 </tmp/peer-finder-patch.diff \
+    && go env -w GO111MODULE=on \
+    && go env -w GOPROXY=https://goproxy.io \
+    && go install \
+    && go build -ldflags="-w -s" \
+    && upx -9 peer-finder
+ADD on-start.sh on-change.sh peer-finder.sh /peer-finder/
+
+FROM alpine:3.13
+MAINTAINER dbh888<duanbaihong@qq.com>
+ENV PS1='[\u@\w]$'
+COPY --from=build-go  /peer-finder/peer-finder /peer-finder/*.sh /bin/
+
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add --no-cache bash dumb-init
+
+ENTRYPOINT ["/bin/peer-finder.sh"]
+

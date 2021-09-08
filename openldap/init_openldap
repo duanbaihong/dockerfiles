@@ -1,0 +1,327 @@
+function printOK() {
+  if [ $1 -ne 0 ]; then
+    echo -e "[\033[33mFailed\033[0m]"
+  else
+    echo -e "[\033[32m  OK  \033[0m]"
+  fi
+}
+function formatOutput() {
+  width=110
+  str=""
+  arg=$1
+  if [ "$arg" == "title" ]; then
+    for i in `seq 1 $(expr $width + 8)`
+    do
+      str="${str}#"
+    done
+    echo $str
+    return 0
+  fi
+  reparg=`echo $arg|sed 's|\\\033\[[0-9]*m||g'`
+  if [ -n "$2" ]; then
+    reparg2=`echo $2|sed 's|\\\033\[[0-9]*m||g'`
+    argLen=$(expr ${width} - ${#reparg} - ${#reparg2} + 6)
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -e "\033[36m$1$tab$2\033[0m"
+    return 0
+  else
+    argLen=$(expr ${width} - ${#reparg})
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -en "$arg$tab"
+  fi
+}
+function help() {
+  formatOutput title
+  formatOutput " LDAP_ROOT_DOMAIN=${LDAP_ROOT_DOMAIN}" "Domain root,example:www.baidu.com www"
+  formatOutput " LDAP_DOMAIN=${LDAP_DOMAIN}" "Domain. example: baidu.com"
+  formatOutput " LDAP_DEBUG=${LDAP_DEBUG}"  "Log Level: 0 1 16 32 64 128 256 512"
+  formatOutput " LDAP_DATA_DIR=${LDAP_DATA_DIR}" "Data dir:/opt/ldap/data"
+  formatOutput " LDAP_RUN_USER=${LDAP_RUN_USER}"  "Run user. Default: ldap"
+  formatOutput " LDAP_SSL=${LDAP_SSL}" "Enable/Disable SSL, Default: True"
+  formatOutput " LDAP_ROOT_PASSWORD=${LDAP_ROOT_PASSWORD}" "DB Manager User.Default: root"
+  formatOutput " LDAP_ADMIN_USER=${LDAP_ADMIN_USER}" "User manager/add/del user.Defualt: admin"
+  formatOutput " LDAP_ADMIN_PASSWORD=${LDAP_ADMIN_PASSWORD}" "Admin user password.Default: duanbai"
+  formatOutput " LDAP_SYNC_USER=${LDAP_SYNC_USER}" "Sync user,Default: syncuser"
+  formatOutput " LDAP_SYNC_USERPASS=${LDAP_SYNC_USERPASS}" "Sync user password.Default: duanbai"
+  formatOutput " LDAP_SYNC_SSL=${LDAP_SYNC_SSL}" "Enable Sync SSL.Default: True"
+  formatOutput " LDAP_SYNC_PORT=${LDAP_SYNC_PORT}" "Sync from Master Port.Default: 389"
+  formatOutput " LDAP_CONF_DIR=${LDAP_CONF_DIR}" "Config directory.Default: /etc/ldap"
+  formatOutput " LDAP_MASTER=${LDAP_MASTER}" "Master or Slave.Default: Master"
+  if [ "$CMDB_ENABLE" == "true" ]; then
+    formatOutput " CMDB_USER=${CMDB_USER}" "Eanble CMDB admin user.Default: cmdbadmin"
+    formatOutput " CMDB_PASS=${CMDB_PASS}" "Eanble CMDB admin pass.Default: cmdbadmin"
+  fi
+}
+function CreatCerts() {
+    formatOutput title
+    LDAP_DOMAIN_FIRSTPART_TOUPPER=`echo ${LDAP_DOMAIN_FIRSTPART}|tr '[a-z]' '[A-Z]'`
+    SUBJECT=/C=CN/ST=CQ/L=YUBEIQU/O=OPS_${LDAP_DOMAIN_FIRSTPART_TOUPPER}/OU=${LDAP_DOMAIN_FIRSTPART_TOUPPER}/emailAddress=${LDAP_EMAIL}/CN=${LDAP_ROOT_DOMAIN}.${LDAP_DOMAIN}
+    echo -e "Generate certificate files,And enable local listen SSL/TSL ...."
+    mkdir -p ${LDAP_CONF_DIR}/certs/ca \
+             ${LDAP_CONF_DIR}/certs/server \
+             ${LDAP_CONF_DIR}/certs/client \
+             ${LDAP_CONF_DIR}/certs/sync >/dev/null 2>&1 
+    if [ ! -f "${LDAP_CONF_DIR}/certs/ca/ca.crt" ]; then
+      formatOutput "Generating CA Certificates to [${LDAP_CONF_DIR}/certs/ca/]..."
+      openssl genrsa -out ${LDAP_CONF_DIR}/certs/ca/ca.key 2048 >/dev/null 2>&1 
+      yes |head -2|openssl req -new -x509 -days 3650 -subj $SUBJECT -key ${LDAP_CONF_DIR}/certs/ca/ca.key -out ${LDAP_CONF_DIR}/certs/ca/ca.crt >/dev/null 2>&1 
+      printOK $?
+    fi
+    if [ ! -f "${LDAP_CONF_DIR}/certs/ca/dhparam.pem" ]; then
+      formatOutput "Generating dhparam keyfile to [${LDAP_CONF_DIR}/certs/ca/dhparam.pem]..."
+      openssl dhparam -out ${LDAP_CONF_DIR}/certs/ca/dhparam.pem 2048 >/dev/null 2>&1 
+      printOK $?
+    fi
+    if [ ! -f "${LDAP_CONF_DIR}/certs/server/server.crt" ]; then
+      formatOutput "Generating Server Certificates to [${LDAP_CONF_DIR}/certs/server/]..."
+      mkdir -p /demoCA/newcerts
+      touch /demoCA/index.txt /demoCA/serial
+      echo 01 >/demoCA/serial
+      openssl genrsa -out ${LDAP_CONF_DIR}/certs/server/server.key 2048 >/dev/null 2>&1
+      openssl req -new -subj $SUBJECT -key ${LDAP_CONF_DIR}/certs/server/server.key -out ${LDAP_CONF_DIR}/certs/server/server.csr >/dev/null 2>&1
+      yes|head -2|openssl ca -days 3650 -in ${LDAP_CONF_DIR}/certs/server/server.csr -out ${LDAP_CONF_DIR}/certs/server/server.crt -cert ${LDAP_CONF_DIR}/certs/ca/ca.crt -keyfile ${LDAP_CONF_DIR}/certs/ca/ca.key >/dev/null 2>&1 
+      printOK $?
+      rm -rf /demoCA
+    fi
+    if [ ! -f "${LDAP_CONF_DIR}/certs/client/client.crt" ]; then
+      formatOutput "Generating Client Certificates to [${LDAP_CONF_DIR}/certs/client/]..."
+      mkdir -p /demoCA/newcerts
+      touch /demoCA/index.txt /demoCA/index.txtserial
+      echo 01 >/demoCA/serial
+      openssl genrsa -out ${LDAP_CONF_DIR}/certs/client/client.key 2048 >/dev/null 2>&1
+      openssl req -new -subj $SUBJECT -key ${LDAP_CONF_DIR}/certs/client/client.key -out ${LDAP_CONF_DIR}/certs/client/client.csr >/dev/null 2>&1
+      yes|head -2|openssl ca -days 3650 -in ${LDAP_CONF_DIR}/certs/client/client.csr -out ${LDAP_CONF_DIR}/certs/client/client.crt -cert ${LDAP_CONF_DIR}/certs/ca/ca.crt -keyfile ${LDAP_CONF_DIR}/certs/ca/ca.key >/dev/null 2>&1 
+      printOK $?
+      rm -rf /demoCA
+    fi
+    formatOutput title
+}
+function enable_cmdb_config(){
+    CMDB_PASSWORD_RSA=`${LDAP_INSTALL_PREFIX}/sbin/slappasswd -s ${CMDB_PASS}`
+    formatOutput "Generate CMDB configuration and manage users (\033[32m${CMDB_USER}\033[0m) password:\033[31m${CMDB_PASS}\033[0m..."
+    cat <<EOF >${LDAP_CONF_DIR}/ldif/cmdb_init.ldif
+dn: ou=Cmdbldap,ou=Groups,${LDAP_SUFFIX}
+objectClass: organizationalUnit
+objectClass: top
+ou: Cmdbldap
+description: Cmdb认证权限组
+
+dn: uid=${CMDB_USER},ou=Users,${LDAP_SUFFIX}
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectclass: person
+objectClass: top
+uid: ${CMDB_USER}
+cn: Cmdb管理用户
+sn: Cmdb管理用户
+userPassword: ${CMDB_PASSWORD_RSA}
+description: Cmdb初始用户
+
+dn: cn=cmdb-admin,ou=Cmdbldap,ou=Groups,${LDAP_SUFFIX}
+objectClass: groupOfUniqueNames
+objectClass: top
+cn: cmdb-admin
+uniqueMember: uid=${CMDB_USER},ou=Users,${LDAP_SUFFIX}
+description: cmdb管理用户组
+EOF
+    ${LDAP_INSTALL_PREFIX}/sbin/slapadd -l ${LDAP_CONF_DIR}/ldif/cmdb_init.ldif -F ${LDAP_CONF_DIR}/slapd.d -n 2 >/tmp/status.txt 2>&1
+    printOK $?
+    cat /tmp/status.txt
+}
+function init_config() {
+  LDAP_ROOT_PASSWORD_RSA=`${LDAP_INSTALL_PREFIX}/sbin/slappasswd -s ${LDAP_ROOT_PASSWORD}`
+  LDAP_SYNC_USERPASS_RSA=`${LDAP_INSTALL_PREFIX}/sbin/slappasswd -s ${LDAP_SYNC_USERPASS}`
+  LDAP_ADMIN_PASSWORD_RSA=`${LDAP_INSTALL_PREFIX}/sbin/slappasswd -s ${LDAP_ADMIN_PASSWORD}`
+
+  LDAP_SUFFIX="dc=$(echo $LDAP_DOMAIN | sed 's/\./,dc=/g')"
+  LDAP_DOMAIN_FIRSTPART="$(echo $LDAP_DOMAIN | cut -d. -f1)"
+  mkdir -p ${LDAP_CONF_DIR}/slapd.d \
+           ${LDAP_CONF_DIR}/certs  \
+           ${LDAP_CONF_DIR}/ldif \
+           ${LDAP_DATA_DIR}/${LDAP_DOMAIN_FIRSTPART} \
+           ${LDAP_DATA_DIR}/accesslog
+  # 定义 LDAP主从关系！
+  if [ "$LDAP_MASTER" == "Master" ]; then
+    LDAP_CONF=${LDAP_INSTALL_PREFIX}/etc/openldap/slapd.conf.templete
+  else
+    LDAP_CONF=${LDAP_INSTALL_PREFIX}/etc/openldap/slapd_slave.conf.templete
+  fi
+  # 是否支持ssl
+  if [ "$LDAP_SYNC_SSL" == "True" ]; then
+      LDAP_SYNC_PORT=636
+      LDAP_MASTER_ADDRESS=ldaps://$LDAP_ROOT_DOMAIN.$LDAP_DOMAIN
+      LDAP_SLAVE_SSL_ARGS="tls_cacert=${LDAP_CONF_DIR}/certs/sync/ca.crt\n    tls_cert=${LDAP_CONF_DIR}/certs/sync/client.crt\n    tls_key=${LDAP_CONF_DIR}/certs/sync/client.key\n    tls_reqcert=${LDAP_TLS_VERIFY_CLIENT}"
+  else
+      LDAP_SYNC_PORT=389
+      LDAP_MASTER_ADDRESS=ldap://$LDAP_ROOT_DOMAIN.$LDAP_DOMAIN
+      LDAP_SLAVE_SSL_ARGS=""
+  fi
+  adduser -D -H -s /sbin/nologin -u 1000 ${LDAP_RUN_USER} >& /dev/null;
+  if [ ! -f "${LDAP_CONF_DIR}/slapd.conf" ]; then
+    if [ "$LDAP_SSL" == "True" ]; then
+      CreatCerts
+      LDAP_SSL_CONFIG="TLSCipherSuite          HIGH:MEDIUM:+SSLv2:+TLSv1:+SSLv3\nTLSCACertificateFile    ${LDAP_CONF_DIR}/certs/ca/ca.crt\nTLSCertificateFile      ${LDAP_CONF_DIR}/certs/server/server.crt\nTLSCertificateKeyFile   ${LDAP_CONF_DIR}/certs/server/server.key\n\nTLSDHParamFile          ${LDAP_CONF_DIR}/certs/ca/dhparam.pem\nTLSVerifyClient         ${LDAP_TLS_VERIFY_CLIENT}" 
+    else
+      formatOutput title
+    fi
+    if [ "$LDAP_SYNC_SSL" == "True" ] && [ "$LDAP_MASTER" != "Master" ]; then
+      formatOutput "Synchronization is enabled by SSL/TSL connection."
+      printOK 0
+      echo -e "\033[33mPlease copy from Master certificates files ${LDAP_CONF_DIR}/certs/client/*} to local.\033[0m"
+    fi
+    formatOutput "Configuration file not found,generate the initial configuration file to ${LDAP_CONF_DIR}/slapd.conf"
+    cat ${LDAP_CONF} \
+      | sed "s|@@LDAP_INSTALL_PREFIX@@|$LDAP_INSTALL_PREFIX|g" \
+      | sed "s|@@LDAP_DATA_DIR@@|$LDAP_DATA_DIR|g" \
+      | sed "s|@@LDAP_DOMAIN_FIRSTPART@@|$LDAP_DOMAIN_FIRSTPART|g" \
+      | sed "s|@@LDAP_ROOT_DOMAIN@@|$LDAP_ROOT_DOMAIN|g" \
+      | sed "s|@@LDAP_DOMAIN@@|$LDAP_DOMAIN|g" \
+      | sed "s|@@LDAP_SYNC_PORT@@|$LDAP_SYNC_PORT|g" \
+      | sed "s|@@LDAP_ROOT_PASSWORD_RSA@@|$LDAP_ROOT_PASSWORD_RSA|g" \
+      | sed "s|@@LDAP_ADMIN_USER@@|$LDAP_ADMIN_USER|g" \
+      | sed "s|@@LDAP_SYNC_USER@@|$LDAP_SYNC_USER|g" \
+      | sed "s|@@LDAP_SYNC_USERPASS@@|$LDAP_SYNC_USERPASS|g" \
+      | sed "s|@@LDAP_SYNC_USERPASS_RSA@@|$LDAP_SYNC_USERPASS_RSA|g" \
+      | sed "s|@@LDAP_MASTER_ADDRESS@@|$LDAP_MASTER_ADDRESS|g" \
+      | sed "s|@@LDAP_SLAVE_SSL_ARGS@@|$LDAP_SLAVE_SSL_ARGS|g" \
+      | sed "s|@@LDAP_SSL_CONFIG@@|$LDAP_SSL_CONFIG|g" \
+      | sed "s|@@LDAP_SUFFIX@@|$LDAP_SUFFIX|g" >${LDAP_CONF_DIR}/slapd.conf
+    printOK $?
+  fi
+  dbNum=`cat ${LDAP_CONF_DIR}/slapd.conf |grep -E "^database"|grep -vc config`
+  dbs=""
+  dbstatus=0
+  for db in `seq 2 $dbNum`
+  do
+    dbs="${dbs}[${db}]."
+    ${LDAP_INSTALL_PREFIX}/sbin/slapadd -f ${LDAP_CONF_DIR}/slapd.conf -d $LDAP_DEBUG -n $db
+    if [ $? -ne 0 ]; then
+      dbstatus=1
+    fi
+  done
+  formatOutput "Create the initial database file.... ${dbs}"
+  if [ $dbstatus -ne 0 ]; then
+    printOK 1
+    exit 1
+  else
+    printOK 0
+  fi
+  formatOutput "Openldap initial config files ...."
+  ${LDAP_INSTALL_PREFIX}/sbin/slaptest -f ${LDAP_CONF_DIR}/slapd.conf -F ${LDAP_CONF_DIR}/slapd.d  >/tmp/status.txt 2>&1
+  if [ $? -ne 0 ]; then
+    printOK 1
+    cat /tmp/status.txt
+    exit 1
+  else
+    printOK 0
+    formatOutput "Repair OPENLDAP directory permissions...."
+    chown -R ${LDAP_RUN_USER}:${LDAP_RUN_USER} ${LDAP_INSTALL_PREFIX}/etc ${LDAP_INSTALL_PREFIX}/lib ${LDAP_INSTALL_PREFIX}/var/run ${LDAP_DATA_DIR} ${LDAP_CONF_DIR}
+    printOK $?
+    cat <<EOF >${LDAP_CONF_DIR}/ldif/base.ldif
+dn: ${LDAP_SUFFIX}
+objectClass: dcObject
+objectClass: organization
+o: `echo ${LDAP_DOMAIN_FIRSTPART}|tr '[a-z]' '[A-Z]'` Company,Inc.
+dc: ${LDAP_DOMAIN_FIRSTPART}
+description: ${LDAP_DOMAIN} Base DN
+
+dn: ou=SystemUser,${LDAP_SUFFIX}
+objectClass: organizationalUnit
+objectClass: top
+ou: SystemUser
+description: 系统用户组
+
+dn: ou=Users,${LDAP_SUFFIX}
+objectClass: organizationalUnit
+objectClass: top
+ou: Users
+description: 认证用户组
+
+dn: ou=Groups,${LDAP_SUFFIX}
+objectClass: organizationalUnit
+objectClass: top
+ou: Groups
+description: 认证权限组
+EOF
+    cat <<EOF >${LDAP_CONF_DIR}/ldif/ppolicy.ldif
+dn: ou=Policies,${LDAP_SUFFIX}
+objectClass: organizationalUnit
+objectClass: top
+ou: policies
+description: 密码策略
+
+dn: cn=default,ou=Policies,${LDAP_SUFFIX}
+cn: default
+objectClass: pwdPolicy
+objectClass: person
+objectClass: top
+pwdAttribute: userPassword
+pwdMinAge: 0
+pwdMaxAge: 31536000
+pwdInHistory: 5
+pwdCheckQuality: 0
+pwdMinLength: 5
+pwdExpireWarning: 28512000
+pwdGraceAuthNLimit: 5
+pwdLockout: TRUE
+pwdLockoutDuration: 300
+pwdMaxFailure: 10
+pwdFailureCountInterval: 30
+pwdMustChange: FALSE
+pwdAllowUserChange: TRUE
+pwdSafeModify: FALSE
+sn: Default policy
+EOF
+    formatOutput "Generate [${LDAP_DOMAIN}] Base DN [\033[32m${LDAP_SUFFIX}\033[0m]...."
+    ${LDAP_INSTALL_PREFIX}/sbin/slapadd -l ${LDAP_CONF_DIR}/ldif/base.ldif -F ${LDAP_CONF_DIR}/slapd.d -n 2 >/tmp/status.txt 2>&1
+    printOK $?
+    cat /tmp/status.txt
+    formatOutput "Generate Password default policies.."
+    ${LDAP_INSTALL_PREFIX}/sbin/slapadd -l ${LDAP_CONF_DIR}/ldif/ppolicy.ldif -F ${LDAP_CONF_DIR}/slapd.d -n 2 >/tmp/status.txt 2>&1
+    printOK $?
+    formatOutput "Generate initial openldap root user (\033[32mroot\033[0m) password:\033[31m${LDAP_ROOT_PASSWORD}\033[0m"
+    printOK $?
+    cat <<EOF >${LDAP_CONF_DIR}/ldif/${LDAP_ADMIN_USER}.ldif
+dn: cn=${LDAP_ADMIN_USER},ou=SystemUser,${LDAP_SUFFIX}
+objectclass: person
+cn: ${LDAP_ADMIN_USER}
+sn: ${LDAP_ADMIN_USER}
+userPassword: ${LDAP_ADMIN_PASSWORD_RSA}
+description: Manager User
+EOF
+    formatOutput "Generate Manager user (\033[32m${LDAP_ADMIN_USER}\033[0m) and password:\033[31m${LDAP_ADMIN_PASSWORD}\033[0m"
+    ${LDAP_INSTALL_PREFIX}/sbin/slapadd -l ${LDAP_CONF_DIR}/ldif/${LDAP_ADMIN_USER}.ldif -F ${LDAP_CONF_DIR}/slapd.d -n 2 >/tmp/status.txt 2>&1
+    printOK $?
+    cat /tmp/status.txt
+    if [ "$LDAP_MASTER" == "Master" ]; then
+      formatOutput "Generate Replication user (\033[32m${LDAP_SYNC_USER}\033[0m) and password:\033[31m${LDAP_SYNC_USERPASS}\033[0m"
+      cat <<EOF >${LDAP_CONF_DIR}/ldif/${LDAP_SYNC_USER}.ldif
+dn: cn=${LDAP_SYNC_USER},ou=SystemUser,${LDAP_SUFFIX}
+objectClass: simpleSecurityObject
+objectclass: person
+cn: ${LDAP_SYNC_USER}
+sn: ${LDAP_SYNC_USER}
+userPassword: ${LDAP_SYNC_USERPASS_RSA}
+description: Replication  User
+EOF
+      ${LDAP_INSTALL_PREFIX}/sbin/slapadd -l ${LDAP_CONF_DIR}/ldif/${LDAP_SYNC_USER}.ldif -F ${LDAP_CONF_DIR}/slapd.d -n 2 >/tmp/status.txt 2>&1
+      printOK $?
+      cat /tmp/status.txt
+    else
+      formatOutput "Current Synchronous users (\033[32m${LDAP_SYNC_USER}\033[0m) and passwords:\033[31m${LDAP_SYNC_USERPASS}\033[0m"
+      printOK 0
+    fi
+  fi
+  rm -f /tmp/status.txt
+  if [ "$CMDB_ENABLE" == "true" ]; then
+    enable_cmdb_config
+  fi
+}

@@ -1,0 +1,85 @@
+#/bin/sh
+
+function printOK() {
+  if [ $1 -ne 0 ]; then
+    echo -e "[\033[33mFailed\033[0m]"
+  else
+    echo -e "[\033[32m  OK  \033[0m]"
+  fi
+}
+function formatOutput() {
+  width=110
+  str=""
+  arg=$1
+  if [ "$arg" == "title" ]; then
+    for i in `seq 1 $(expr $width + 8)`
+    do
+      str="${str}#"
+    done
+    echo $str
+    return 0
+  fi
+  reparg=`echo $arg|sed 's|\\\033\[[0-9]*m||g'`
+  if [ -n "$2" ]; then
+    reparg2=`echo $2|sed 's|\\\033\[[0-9]*m||g'`
+    argLen=$(expr ${width} - ${#reparg} - ${#reparg2} + 6)
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -e "\033[36m$1$tab$2\033[0m"
+    return 0
+  else
+    argLen=$(expr ${width} - ${#reparg})
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -en "$arg$tab"
+  fi
+}
+
+function init_config(){
+  formatOutput "Generate the Ansible configuration file and close the prompt \"yes\" input.."
+  if [ ! -d "/etc/ansible" ]; then
+    mkdir /etc/ansible
+  fi
+  cat <<EOF>/etc/ansible/ansible.cfg
+[defaults]
+host_key_checking = False
+deprecation_warnings = False
+EOF
+  printOK $?
+  formatOutput "Initial ${APP_NAME} User [\033[31m${JENKINS_RUNUSER}\033[0m]"
+  adduser -D -h ${JENKINS_HOME} -s /sbin/nologin -u ${JENKINS_RUNID} ${JENKINS_RUNUSER} >& /dev/null;
+  printOK $?
+  
+  formatOutput "Repair work directory [/opt/ ${JENKINS_WARDIR}] permissions...."
+  chown ${JENKINS_RUNUSER}.${JENKINS_RUNUSER} /opt/* ${JENKINS_WARDIR}  -R
+  printOK $?
+
+  formatOutput "Download dependency related packages such as ansible,node,yarn..."
+  apk add $JENKINS_BASEAPK ${APK_DEPENDENCY}  &>/dev/null 2>&1
+  printOK $?
+
+  formatOutput "Add custom \"heath_check\" module to ansible..."
+  mv /opt/health_check.py /usr/lib/python3.7/site-packages/ansible/modules/files/
+  printOK $?
+  formatOutput "Download the Oracle JDK dependency package glibc..."
+  printOK $?
+  wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk -P /tmp/ 2>&1 >/tmp/download.log
+  formatOutput "Download the Oracle JDK dependency package glibc-bin..."
+  printOK $?
+  wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-bin-${GLIBC_VERSION}.apk -P /tmp/ 2>&1 >/tmp/download.log
+  formatOutput "Download the Oracle JDK dependency package glibc-i18n..."
+  printOK $?
+  wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-i18n-${GLIBC_VERSION}.apk -P /tmp/ 2>&1 >/tmp/download.log
+  formatOutput "Install the Oracle JDK dependency package glibc glibc-bin glibc-i18n..."
+  apk add --allow-untrusted /tmp/*.apk 
+  printOK $?
+  #/usr/glibc-compat/bin/localedef -i en_US -f UTF-8 en_US.UTF-8
+  /usr/glibc-compat/bin/localedef --force --inputfile POSIX --charmap UTF-8 "$LANG"
+}
+

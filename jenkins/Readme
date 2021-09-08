@@ -1,0 +1,4 @@
+# jenkins
+    集成docker ansible nodejs openjdk
+# 扩展jar目录
+   /opt/jenkins/lib

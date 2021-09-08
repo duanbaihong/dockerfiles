@@ -1,0 +1,14 @@
+diff --git a/src/openvpn/otime.c b/src/openvpn/otime.c
+index 640168a..454b1cc 100644
+--- a/src/openvpn/otime.c
++++ b/src/openvpn/otime.c
+@@ -129,7 +129,7 @@ time_string(time_t t, int usec, bool show_usec, struct gc_arena *gc)
+     t = tv.tv_sec;
+     struct tm *tm = localtime(&t);
+ 
+-    buf_printf(&out, "%04d-%02d-%02d %02d:%02d:%02d",
++    buf_printf(&out, "[%04d/%02d/%02d %02d:%02d:%02d]",
+                tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday,
+                tm->tm_hour, tm->tm_min, tm->tm_sec);
+ 
+

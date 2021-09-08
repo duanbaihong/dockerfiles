@@ -1,0 +1,59 @@
+FROM alpine:3.8
+MAINTAINER dbh888<duanbaihong@qq.com>
+
+ENV EMAIL=duanbaihong@qq.com \
+    OPENVPN_PLUGINTYPE=python \
+    OPENVPN_PROTO='tcp' \
+    OPENVPN_PORT='1194' \
+    OPENVPN_DEV='tun' \
+    OPENVPN_PREFIX=/opt/openvpn \
+    OPENVPN_VERSION=2.4.7 \
+    OPENVPN_NETADDR=10.10.0.0/24 \
+    OPENVPN_AUTH_LDAP=false \
+    OPENVPN_DOMAIN=openvpn.iwubida.com \
+    OPENVPN_USERID=1000 \
+    OPENVPN_USER=openvpn \
+    XTABLES_LIBDIR=/usr/lib/xtables/ \
+    installDeps='gcc cmake make autoconf automake g++ linux-headers linux-pam-dev zlib-dev libc-utils lzo-dev libtool openssl-dev python-dev' \
+    installDeps2='libressl-dev openldap-dev' \
+    appPkg='iptables lzo libressl libssl1.0 bc python py2-pip libldap sudo' \
+    TERM=xterm 
+ADD https://github.com/OpenVPN/openvpn/archive/v${OPENVPN_VERSION}.tar.gz checkpwd.py learn.py server.conf auth-ldap.yaml /tmp/
+# ADD https://swupdate.openvpn.org/community/releases/openvpn-${OPENVPN_VERSION}.tar.gz checkpwd.py learn.py openvpn server.conf auth-ldap.yaml /tmp
+# COPY checkpwd.py learn.py openvpn server.conf auth-ldap.yml /tmp/
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories \
+    && apk add --no-cache ${installDeps} ${appPkg} \
+    && cd /tmp/ \
+    && tar xfz v$OPENVPN_VERSION.tar.gz \
+    && cd openvpn-$OPENVPN_VERSION \
+    && autoreconf -i -v -f \
+    && ./configure --prefix=${OPENVPN_PREFIX} \
+       --enable-static\
+       --enable-async-push \
+       --enable-iproute2 \
+       --enable-pam-dlopen \
+       OPENSSL_LIBS='-lssl -lcrypto' \
+    && make \
+    && make install \
+    && apk del openssl-dev \
+    && apk add ${installDeps2}  \
+    && pip install --upgrade pip \
+    && pip install python-ldap pyyaml\
+    && apk del ${installDeps} ${installDeps2} \
+    && rm -rf /var/cache/apk/* \
+    && ln -sf ${OPENVPN_PREFIX}/sbin/openvpn /usr/bin \
+    && mkdir ${OPENVPN_PREFIX}/example ${OPENVPN_PREFIX}/etc ${OPENVPN_PREFIX}/run ${OPENVPN_PREFIX}/logs -p \
+    && cp /tmp/*.conf ${OPENVPN_PREFIX}/example \
+    && cp /tmp/*.yml ${OPENVPN_PREFIX}/example \
+    && cp /tmp/*.py ${OPENVPN_PREFIX}/sbin \
+    && rm -rf /tmp/* /root/.cache \
+    && echo -e "[ ca ]\ndefault_ca= CA_default\n[ CA_default ]\ndir= /demoCA\ncerts= \$dir/certs\ncrl_dir= \$dir/crl\ndatabase= \
+\$dir/index.txt\nnew_certs_dir= \$dir/newcerts\ncertificate= \$dir/cacert.pem \nserial= \$dir/serial\npolicy= policy_match\n\
+default_md= default\nunique_subject=no\n\
+[ policy_match ]\ncountryName= match\nstateOrProvinceName= match\norganizationName= match\norganizationalUnitName= optional\n\
+commonName= supplied\nemailAddress= optional\n">>/etc/ssl/openssl.cnf
+COPY entrypoint.sh init_openvpn /bin/
+VOLUME ["$OPENVPN_PREFIX"]
+EXPOSE 1194
+WORKDIR ${OPENVPN_PREFIX}/
+ENTRYPOINT ["/bin/entrypoint.sh"]

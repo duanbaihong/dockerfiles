@@ -1,0 +1,22 @@
+FROM anapsix/alpine-java:latest
+MAINTAINER dbh888 <duanbaihong@qq.com>
+
+ENV JETTYCAT_INSTALL=/opt/jettycat \
+    CAT_RUN_USER=cat
+
+
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && cd $(dirname $JETTYCAT_INSTALL) \
+    && funwget() { wget -c -t 0 $1 -O - |tar -zxf -; if [ $? -ne 0 ]; then echo $1;funwget $1; fi }; \
+    funwget http://test2-h5.xiujiadian.com/jettycat.tar.gz \
+    && adduser -D -h $JETTYCAT_INSTALL ${CAT_RUN_USER} \
+    && mkdir /data/appdatas/cat/ -p \
+    && chown -R $CAT_RUN_USER:$CAT_RUN_USER $JETTYCAT_INSTALL /data
+
+USER  $CAT_RUN_USER
+
+VOLUME ["/data"]
+
+EXPOSE 9080 2280
+
+ENTRYPOINT [ "/opt/jettycat/bin/startup.sh" ]

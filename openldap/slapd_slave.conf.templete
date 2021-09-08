@@ -1,0 +1,150 @@
+#
+# See slapd.conf(5) for details on configuration options.
+# This file should NOT be world readable.
+#
+
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/core.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/collective.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/corba.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/cosine.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/duaconf.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/dyngroup.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/inetorgperson.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/java.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/misc.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/nis.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/openldap.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ppolicy.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/pmi.schema
+# 自定义的samba publickey sudo
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ldapSshPublicKey.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ldapSshSudo.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ldapSamba.schema
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ldapOpenVpnIPtables.schema
+
+# Define global ACLs to disable default read access.
+
+# Do not enable referrals until AFTER you have a working directory
+# service AND an understanding of referrals.
+#referral   ldap://root.openldap.org
+
+pidfile         @@LDAP_INSTALL_PREFIX@@/var/run/slapd.pid
+argsfile        @@LDAP_INSTALL_PREFIX@@/var/run/slapd.args
+
+# Load dynamic backend modules:
+modulepath      @@LDAP_INSTALL_PREFIX@@/libexec/openldap
+# moduleload    back_ldap.la
+moduleload      back_mdb.la
+moduleload      back_passwd.la
+moduleload      dyngroup.la
+moduleload      memberof.la
+moduleload      ppolicy.la
+moduleload      smbk5pwd.la
+moduleload      accesslog.la
+moduleload      syncprov.la
+moduleload      refint.la
+moduleload      valsort.la
+
+# Sample security restrictions
+#   Require integrity protection (prevent hijacking)
+#   Require 112-bit (3DES or better) encryption for updates
+#   Require 63-bit encryption for simple bind
+# security ssf=1 update_ssf=112 simple_bind=64
+
+@@LDAP_SSL_CONFIG@@
+
+access to attrs=userPassword
+   by self write
+   by anonymous auth
+   by dn.base="cn=root,@@LDAP_SUFFIX@@" write
+   by dn.base="cn=@@LDAP_ADMIN_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" write
+   by * none
+access to attrs=shadowLastChange
+   by self write
+   by * read
+
+access to *
+   by dn.base="cn=root,@@LDAP_SUFFIX@@" write
+   by dn.base="cn=@@LDAP_ADMIN_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" write
+   by dn.base="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" read
+   by anonymous auth
+   by self read
+   by * none
+
+
+
+#######################################################################
+# MDB database definitions
+#######################################################################
+database    monitor
+rootdn      "cn=monitoring,cn=Monitor"
+access to dn.subtree="cn=Monitor"
+        by dn.exact="cn=@@LDAP_ADMIN_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" write
+        by users read
+        by * none
+
+database    config
+rootdn      "cn=root,cn=config"
+rootpw      @@LDAP_ROOT_PASSWORD_RSA@@
+
+
+database    mdb
+maxsize     10737418240
+directory   @@LDAP_DATA_DIR@@/@@LDAP_DOMAIN_FIRSTPART@@
+suffix      "@@LDAP_SUFFIX@@"
+rootdn      "cn=root,@@LDAP_SUFFIX@@"
+rootpw      @@LDAP_ROOT_PASSWORD_RSA@@
+index       objectClass                       eq
+index       ou,cn,mail,surname,givenname      eq,pres,sub
+index       uidNumber,gidNumber,loginShell    eq,pres
+index       uid,memberUid                     eq,pres,sub
+index       nisMapName,nisMapEntry            eq,pres,sub
+index       uniqueMember,member               eq,pres
+index       entryCSN,entryUUID                eq
+index       sudoUser,sudoHost,modifyTimestamp eq
+index       memberOf                          eq
+
+# alpha-ascend, alpha-descend, numeric-ascend, numeric-descend or weighted
+overlay             valsort
+valsort-attr        uniqueMember ou=Groups,@@LDAP_SUFFIX@@ alpha-ascend
+valsort-attr        memberUid    ou=Groups,@@LDAP_SUFFIX@@ alpha-ascend
+
+overlay                ppolicy
+ppolicy_default        cn=default,ou=Policies,@@LDAP_SUFFIX@@
+ppolicy_hash_cleartext TRUE
+ppolicy_use_lockout    TRUE
+
+overlay              memberof
+memberof-group-oc    groupOfUniqueNames
+memberof-member-ad   uniqueMember
+memberof-memberof-ad memberof
+memberof-dangling    ignore
+memberof-refint      TRUE
+
+overlay              refint
+refint_attributes    member memberof uniqueMember manager owner
+
+overlay              syncprov
+syncprov-checkpoint  20 1
+syncprov-sessionlog  200
+
+# syncrepl directives             
+syncrepl rid=001
+    provider=@@LDAP_MASTER_ADDRESS@@:@@LDAP_SYNC_PORT@@
+    bindmethod=simple
+    binddn="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@"
+    credentials=@@LDAP_SYNC_USERPASS@@
+    searchbase="@@LDAP_SUFFIX@@"
+    logbase="cn=accesslog"
+    logfilter="(&(objectClass=auditWriteObject)(reqResult=0))"
+    schemachecking=on
+    type=refreshAndPersist
+    retry="60 +"
+    scope=sub
+    attrs="*,+"
+    syncdata=accesslog
+    @@LDAP_SLAVE_SSL_ARGS@@
+        
+# Refer updates to the master
+updateref @@LDAP_MASTER_ADDRESS@@
+

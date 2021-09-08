@@ -1,0 +1,25 @@
+FROM alpine:3.13
+MAINTAINER dbh888<duanbaihong@qq.com>
+
+ENV NPS_VERSION=0.26.10 \
+    NPS_PREFIX=/opt/nps \
+    NPS_RUNUSER=nps \
+    NPS_RUNUSERID=1000 \
+    NPS_TYPE=Server \
+    NPS_WEB_PASSWORD=''
+
+ADD entrypoint.sh init_nps /bin/
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add su-exec libcap dumb-init \
+    && mkdir ${NPS_PREFIX}/logs -p \
+    && funwget() { wget -c -t 0 $1 -O - |tar -zxf - -C "${NPS_PREFIX}"; if [ $? -ne 0 ]; then funwget $1; fi } \
+    && funwget https://github.com/ehang-io/nps/releases/download/v${NPS_VERSION}/linux_amd64_server.tar.gz \
+    && cd ${NPS_PREFIX} \
+    && rm -rf /var/cache/apk/* 
+
+VOLUME ["${NPS_PREFIX}/conf"]
+EXPOSE 8080
+WORKDIR ${NPS_PREFIX}
+ENTRYPOINT ["/bin/entrypoint.sh"]
+
+https://github.com/ehang-io/nps/releases/download/v${NPS_VERSION}/linux_amd64_server.tar.gz

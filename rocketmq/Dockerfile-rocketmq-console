@@ -1,0 +1,19 @@
+FROM anapsix/alpine-java:latest
+ARG ROCKETMQ_CONSOLE_PREFIX=/a/apps/rocketmq
+MAINTAINER dbh888 <duanbaihong@qq.com>
+
+ENV PATH=$PATH:/opt/jdk/bin \
+    ROCKETMQ_CONSOLE_PREFIX=${ROCKETMQ_CONSOLE_PREFIX} \
+    JVM_OPTS="" \
+    ROCKETMQ_ARGS="" \
+    PS1='[\u@\w]$' 
+
+ADD rocketmq-console-ng-2.0.0.jar entrypoint-rocketmq-console.sh ${ROCKETMQ_CONSOLE_PREFIX}/
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add bash dumb-init \
+    && mv ${ROCKETMQ_CONSOLE_PREFIX}/entrypoint-rocketmq-console.sh /bin/entrypoint.sh \
+    && chmod +x /bin/entrypoint.sh
+
+WORKDIR ${ROCKETMQ_CONSOLE_PREFIX}/
+ENTRYPOINT ["/bin/entrypoint.sh"]
+

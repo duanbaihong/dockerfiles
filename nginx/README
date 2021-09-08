@@ -1,0 +1,9 @@
+一个是基本的NGINX封闭，并且启用压缩，本docker打包出来只有22M
+JEMALLOC只有在alpine3.8编译才正常。不会有segment error
+
+Dockerfile_consul-template: 打包会带consul-template 同步编译
+启用参数:
+    ENABLE_CONSUL_TEMPLATE=true
+    CONSUL_ADDRESS=http://xxxxxxx
+    CONSUL_TOKEN=xxxxxxxxx
+    

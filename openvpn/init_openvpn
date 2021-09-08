@@ -1,0 +1,157 @@
+function printOK() {
+  if [ $1 -ne 0 ]; then
+    echo -e "[\033[33mFailed\033[0m]"
+  else
+    echo -e "[\033[32m  OK  \033[0m]"
+  fi
+}
+function formatOutput() {
+  width=110
+  str=""
+  arg=$1
+  if [ "$arg" == "title" ]; then
+    for i in `seq 1 $(expr $width + 8)`
+    do
+      str="${str}#"
+    done
+    echo $str
+    return 0
+  fi
+  reparg=`echo $arg|sed 's|\\\033\[[0-9]*m||g'`
+  if [ -n "$2" ]; then
+    reparg2=`echo $2|sed 's|\\\033\[[0-9]*m||g'`
+    argLen=$(expr ${width} - ${#reparg} - ${#reparg2} + 6)
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -e "\033[36m$1$tab$2\033[0m"
+    return 0
+  else
+    argLen=$(expr ${width} - ${#reparg})
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -en "$arg$tab"
+  fi
+}
+cidr_to_mask() {
+    bin_prefix=""
+    prefix_cnt1=${1}
+    for i in `seq 1 ${prefix_cnt1}`
+    do
+        bin_prefix="${bin_prefix}1"
+    done
+    prefix_cnt2=$((32 - ${prefix_cnt1}))
+    for i in `seq 1 ${prefix_cnt2}`
+    do
+        bin_prefix="${bin_prefix}0"
+    done
+
+    INTERNAL_mask=""
+    for i in `seq 0 8 31`
+    do
+        val=${bin_prefix:${i}:8}
+        tmp_mask=$(echo "obase=10;ibase=2;${val}" | bc)
+        if [ "${INTERNAL_mask}" = "" ];then
+            INTERNAL_mask="${tmp_mask}"
+        else
+            INTERNAL_mask="${INTERNAL_mask}.${tmp_mask}"
+        fi
+    done
+    echo $INTERNAL_mask
+}
+function CreatCerts() {
+  formatOutput "title"
+  OPENVPN_DOMAIN_FIRST_TOUPPER=`echo ${OPENVPN_DOMAIN}|awk -F '.' '{print $1}'|tr '[a-z]' '[A-Z]'`
+  OPENVPN_DOMAIN_SECEND_TOUPPER=`echo ${OPENVPN_DOMAIN}|awk -F '.' '{print $2}'|tr '[a-z]' '[A-Z]'`
+  SUBJECT=/C=CN/ST=CQ/L=YUZHONGQU/O=OPS_${OPENVPN_DOMAIN_FIRST_TOUPPER}/OU=${OPENVPN_DOMAIN_SECEND_TOUPPER}/emailAddress=${EMAIL}/CN=${OPENVPN_DOMAIN}
+  formatOutput "Generating CA Certificates to [${OPENVPN_PREFIX}/etc/certs/ca/]..."
+  openssl genrsa -out ${OPENVPN_PREFIX}/etc/certs/ca/ca.key 2048 >/dev/null 2>&1 
+  yes |head -2|openssl req -new -x509 -days 3650 -subj $SUBJECT -key ${OPENVPN_PREFIX}/etc/certs/ca/ca.key -out ${OPENVPN_PREFIX}/etc/certs/ca/ca.crt >/dev/null 2>&1 
+  printOK $?
+  formatOutput "Generating Server Certificates to [${OPENVPN_PREFIX}/etc/certs/server/]..."
+  mkdir -p /demoCA/newcerts
+  touch /demoCA/index.txt /demoCA/serial
+  echo 01 >/demoCA/serial
+  openssl genrsa -out ${OPENVPN_PREFIX}/etc/certs/server/server.key 2048 >/dev/null 2>&1
+  openssl req -new -days 3650 -subj $SUBJECT -key ${OPENVPN_PREFIX}/etc/certs/server/server.key -out ${OPENVPN_PREFIX}/etc/certs/server/server.csr >/dev/null 2>&1
+  yes|head -2|openssl ca -days 3650 -in ${OPENVPN_PREFIX}/etc/certs/server/server.csr -out ${OPENVPN_PREFIX}/etc/certs/server/server.crt -cert ${OPENVPN_PREFIX}/etc/certs/ca/ca.crt -keyfile ${OPENVPN_PREFIX}/etc/certs/ca/ca.key >/dev/null 2>&1 
+  printOK $?
+  rm -rf /demoCA
+  formatOutput "Generating Client Certificates to [${OPENVPN_PREFIX}/etc/certs/client/]..."
+  mkdir -p /demoCA/newcerts
+  touch /demoCA/index.txt /demoCA/serial
+  echo 01 >/demoCA/serial
+  openssl genrsa -out ${OPENVPN_PREFIX}/etc/certs/client/client.key 2048 >/dev/null 2>&1
+  openssl req -new -days 3650 -subj $SUBJECT -key ${OPENVPN_PREFIX}/etc/certs/client/client.key -out ${OPENVPN_PREFIX}/etc/certs/client/client.csr >/dev/null 2>&1 
+  yes|head -2|openssl ca -days 3650 -in ${OPENVPN_PREFIX}/etc/certs/client/client.csr -out ${OPENVPN_PREFIX}/etc/certs/client/client.crt -cert ${OPENVPN_PREFIX}/etc/certs/ca/ca.crt -keyfile ${OPENVPN_PREFIX}/etc/certs/ca/ca.key >/dev/null 2>&1 
+  printOK $?
+  rm -rf /demoCA
+  formatOutput "Generating dhparam keyfile to [${OPENVPN_PREFIX}/etc/certs/ca/dhparam.pem]..."
+  openssl dhparam -out ${OPENVPN_PREFIX}/etc/certs/ca/dhparam.pem 2048 >/dev/null 2>&1 
+  printOK $?
+}
+function init_iptables(){
+  if [ ! -f "${OPENVPN_PREFIX}/etc/iptables.conf" ]; then
+    IP_DEVICE=$(ip route | grep default|awk '{print $5}')
+    OPENVPN_ADDR=$(ip -o -4 addr list ${IP_DEVICE} | head -n1 | awk '{print $4}' | cut -d/ -f1)
+    OPENVPN_SERVER_ADDR=`echo $OPENVPN_NETADDR|awk -F "/" '{print $1}'`
+    OPENVPN_SERVER_MASK=`cidr_to_mask $(echo $OPENVPN_NETADDR|awk -F "/" '{print $2}')`
+    iptables -t nat -A POSTROUTING -s ${OPENVPN_NETADDR} -o ${IP_DEVICE}  -j MASQUERADE \
+    && iptables -A INPUT -p ${OPENVPN_PROTO} -m ${OPENVPN_PROTO} --dport 1194 -j ACCEPT \
+    && iptables -A INPUT -s ${OPENVPN_NETADDR} -j ACCEPT \
+    && iptables -I FORWARD -p tcp -s ${OPENVPN_NETADDR} --dport 53 -j ACCEPT \
+    && iptables -I FORWARD -p udp -s ${OPENVPN_NETADDR} --dport 53 -j ACCEPT \
+    && iptables -A FORWARD -s ${OPENVPN_NETADDR} -p all  -j DROP 
+    if [ $? -ne 0 ]; then
+      formatOutput "Add container run parameter \033[31m--add-cap=NET_ADMIN\033[0m parameter to support IPTABLES...."
+      printOK 1
+      exit 1
+    fi
+    iptables-save >${OPENVPN_PREFIX}/etc/iptables.conf
+  else
+    iptables-restore <${OPENVPN_PREFIX}/etc/iptables.conf
+  fi
+}
+function init_kernel(){
+  echo net.ipv4.ip_forward=1 >/etc/sysctl.d/openvpn.conf
+  echo net.ipv6.conf.all.forwarding=1 >>/etc/sysctl.d/openvpn.conf
+  sysctl -w net.ipv4.ip_forward=1 &>/dev/null 2>&1 && sysctl -w net.ipv6.conf.all.forwarding=1 &>/dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    formatOutput "Open the \033[31m--privileged\033[0m parameter of the docker container to support IP forwarding...."
+    printOK 1
+    exit 1
+  fi 
+}
+function init_config(){
+  IP_DEVICE=$(ip route | grep default|awk '{print $5}')
+  OPENVPN_ADDR=$(ip -o -4 addr list ${IP_DEVICE} | head -n1 | awk '{print $4}' | cut -d/ -f1)
+  OPENVPN_SERVER_ADDR=`echo $OPENVPN_NETADDR|awk -F "/" '{print $1}'`
+  OPENVPN_SERVER_MASK=`cidr_to_mask $(echo $OPENVPN_NETADDR|awk -F "/" '{print $2}')`
+  HASE_C_PLUGIN=";"
+  HASE_PYTHON_PLUGIN=";"
+  if [ "${OPENVPN_PLUGINTYPE}" == "c" ]; then
+    HASE_C_PLUGIN=""
+  else
+    HASE_PYTHON_PLUGIN=""
+  fi
+  # OPENVPN_ADDR=$(echo $OPENVPN_NETADDR|awk -F '/' '{print $1}')
+  cat ${OPENVPN_PREFIX}/example/server.conf | \
+  sed "s|@@OPENVPN_PROTO@@|$OPENVPN_PROTO|g"|\
+  sed "s|@@OPENVPN_PORT@@|$OPENVPN_PORT|g"| \
+  sed "s|@@OPENVPN_DEV@@|$OPENVPN_DEV|g"| \
+  sed "s|@@OPENVPN_PREFIX@@|$OPENVPN_PREFIX|g"| \
+  sed "s|@@OPENVPN_SERVER_ADDR@@|$OPENVPN_SERVER_ADDR|g"| \
+  sed "s|@@OPENVPN_SERVER_MASK@@|$OPENVPN_SERVER_MASK|g"| \
+  sed "s|@@OPENVPN_USER@@|$OPENVPN_USER|g"| \
+  sed "s|@@OPENVPN_ADDR@@|$OPENVPN_ADDR|g" | \
+  sed "s|@@HASE_C_PLUGIN@@|$HASE_C_PLUGIN|g"| \
+  sed "s|@@HASE_PYTHON_PLUGIN@@|$HASE_PYTHON_PLUGIN|g" \
+  >${OPENVPN_PREFIX}/etc/server.conf
+}
+
+

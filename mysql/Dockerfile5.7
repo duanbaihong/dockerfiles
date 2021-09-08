@@ -1,0 +1,67 @@
+FROM alpine:3.8
+MAINTAINER dbh888<duanbaihong@qq.com>
+ENV MYSQL_VERSION=5.7.31 \
+    MYSQL_JEMALLOC_VER=5.2.1 \
+    MYSQL_PREFIX=/opt/mysql \
+    MYSQL_USER=mysql \
+    MYSQL_USERID='1000' \
+    MYSQL_PASSWORD='' \
+    MAKE_PACKAGE='gcc g++ make cmake autoconf libstdc++ linux-headers openssl-dev ncurses-dev libtirpc-dev zlib-dev icu libevent-dev cyrus-sasl-dev wget' \
+    DEPENDENCY_PACKAGE='dumb-init libssl1.0 icu-libs ncurses-libs bison rpcgen zlib libevent curl' 
+
+ADD entrypoint.sh \
+    init_mysql \
+    /tmp/
+
+    # && cd /tmp;gcc -o /bin/formatmsg formatmsg.c;chmod +x /bin/formatmsg\
+    # MYSQL_URL=https://cdn.mysql.com/Downloads/MySQL-5.7/mysql-boost-${MYSQL_VERSION}.tar.gz;\
+    # MYSQL_JEMALLOC_URL=https://github.com/jemalloc/jemalloc/archive/${MYSQL_JEMALLOC_VER}.tar.gz \
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; \
+    MYSQL_URL=https://downloads.mysql.com/archives/get/p/23/file/mysql-boost-${MYSQL_VERSION}.tar.gz;\
+    MYSQL_JEMALLOC_URL=https://github.com/jemalloc/jemalloc/archive/refs/tags/${MYSQL_JEMALLOC_VER}.tar.gz \
+    && apk add ${MAKE_PACKAGE} ${DEPENDENCY_PACKAGE}\
+    && cd /tmp \
+    && wget ${MYSQL_URL} && wget ${MYSQL_JEMALLOC_URL} \
+    && for tar in *.tar.gz; do tar xvf $tar; done \
+    && cd /tmp/jemalloc-${MYSQL_JEMALLOC_VER} \
+    && ./autogen.sh \
+    && make -j4 \
+    && make install_lib \
+    && cd /tmp/mysql-${MYSQL_VERSION} \
+    && cmake . -DCMAKE_BUILD_TYPE=Release \
+       -DCMAKE_INSTALL_PREFIX=${MYSQL_PREFIX} \
+       -DMYSQL_DATADIR=${MYSQL_PREFIX}/data \
+       -DSYSCONFDIR=${MYSQL_PREFIX}/etc \
+       -DWITH_INNODB_MEMCACHED=ON \
+       -DENABLED_LOCAL_INFILE=ON \
+       -DDEFAULT_CHARSET=utf8mb4 \
+       -DDEFAULT_COLLATION=utf8mb4_general_ci \
+       -DWITH_ZLIB=bundled \
+       -DMYSQL_UNIX_ADDR=${MYSQL_PREFIX}/run/mysql.sock \
+       -DMYSQLX_UNIX_ADDR=${MYSQL_PREFIX}/run/mysqlx.sock \
+       -DWITHOUT_EXAMPLE_STORAGE_ENGINE=1 \
+       -DWITH_UNIT_TESTS=OFF \
+       -DUSE_LD_LLD=ON \
+       -DWITH_BOOST=boost/boost_1_59_0 \
+       -DUSE_LD_GOLD=OFF \
+       -DINSTALL_MYSQLTESTDIR="" \
+       -DWITH_CURL=system \
+       -DLIBEVENT_INCLUDE_DIRS=/usr/include \
+    && make -j4 \
+    && make install/strip\
+    && sed -i 's|3.8|3.10|g' /etc/apk/repositories \
+    && apk add upx \
+    && upx -9 ${MYSQL_PREFIX}/bin/*;upx -d ${MYSQL_PREFIX}/bin/mysql_config;upx -d ${MYSQL_PREFIX}/bin/mysqld_safe \
+    && cd ~ \
+    && mv /tmp/entrypoint.sh /bin/ \
+    && mv /tmp/init_mysql /bin/ \
+    && apk del ${MAKE_PACKAGE} \
+    && mkdir -p ${MYSQL_PREFIX}/data ${MYSQL_PREFIX}/binlog ${MYSQL_PREFIX}/logs\
+    && rm /tmp/* /var/cache/apk/* /usr/local/lib/*.a -rf 
+
+VOLUME ["${MYSQL_PREFIX}/etc","${MYSQL_PREFIX}/data","${MYSQL_PREFIX}/binlog","${MYSQL_PREFIX}/logs"]
+
+EXPOSE 3306
+
+WORKDIR ${MYSQL_PREFIX}
+ENTRYPOINT ["/bin/entrypoint.sh"]

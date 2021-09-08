@@ -1,0 +1,117 @@
+#/bin/sh
+
+function printOK() {
+  if [ $1 -ne 0 ]; then
+    echo -e "[\033[33mFailed\033[0m]"
+  else
+    echo -e "[\033[32m  OK  \033[0m]"
+  fi
+}
+function formatOutput() {
+  width=110
+  str=""
+  arg=$1
+  if [ "$arg" == "title" ]; then
+    for i in `seq 1 $(expr $width + 8)`
+    do
+      str="${str}#"
+    done
+    echo $str
+    return 0
+  fi
+  reparg=`echo $arg|sed 's|\\\033\[[0-9]*m||g'`
+  if [ -n "$2" ]; then
+    reparg2=`echo $2|sed 's|\\\033\[[0-9]*m||g'`
+    argLen=$(expr ${width} - ${#reparg} - ${#reparg2} + 6)
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -e "\033[36m$1$tab$2\033[0m"
+    return 0
+  else
+    argLen=$(expr ${width} - ${#reparg})
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -en "$arg$tab"
+  fi
+}
+
+
+function init_php_config(){
+  formatOutput title;
+  id $PHP_USER >& /dev/null;
+  if [ $? -ne 0 ]; then
+    formatOutput "Generate the configuration of Nginx configuration PHP agent, based on [\033[31mGET\033[0m] case..."
+    printOK $?
+    cat <<EOF
+  location / {
+      root [php静态文件的目录];
+      index index.php index.html;
+  }
+  location ~ (\.php$) {
+      fastcgi_pass               ${PHP_FPM_ADDR}:${PHP_FPM_PORT};
+      fastcgi_index              index.php;
+      fastcgi_param              SCRIPT_FILENAME          ${PHP_DATA_DIR}/www\$fastcgi_script_name;
+      include                    fastcgi_params;
+  }
+EOF
+    formatOutput "Generate the configuration of Nginx configuration PHP agent, based on [\033[31mPATHINFO\033[0m] case..."
+    printOK $?
+    cat <<EOF
+  # 静态目录定义
+  location ~* (^/js/|^/theme/|^/data/|^/robots.txt$|^/favicon.ico$) {
+      root                        [php静态文件的目录];
+  }
+  location / {
+      if (!-e \$request_filename) {
+         rewrite  ^(/.*)$ /index.php\$1  last;
+         break;
+      }
+  }
+  location ~ (\.php) {
+      fastcgi_pass                ${PHP_FPM_ADDR}:${PHP_FPM_PORT};
+      fastcgi_index               index.php;
+      fastcgi_param               SCRIPT_FILENAME         ${PHP_DATA_DIR}/www\$fastcgi_script_name;
+      include                     fastcgi_params;
+      fastcgi_split_path_info     ^(.+\.php)(.*)$;     
+      fastcgi_param PATH_INFO     \$fastcgi_path_info;
+  }
+EOF
+    formatOutput title
+    formatOutput "Generate php-fpm running user [${PHP_USER}]..."
+    adduser -D -H -s /sbin/nologin -u ${PHP_USER_UID} ${PHP_USER} >& /dev/null;
+    printOK $?;
+    formatOutput "Initial php-fpm7 configuration file..."
+    sed -i "s|;daemonize = yes|daemonize = no|g" /etc/php7/php-fpm.conf && \
+    sed -i "s|^;\s*php_flag\[display_errors\].*|php_flag\[display_errors\] = on|g" /etc/php7/php-fpm.d/www.conf && \
+    sed -i "s|^[;]*\s*listen\s*=\s*127.0.0.1.*|listen = ${PHP_FPM_ADDR}:${PHP_FPM_PORT}|g" /etc/php7/php-fpm.d/www.conf
+    sed -i "s|^user = nobody|user = ${PHP_USER}|g" /etc/php7/php-fpm.d/www.conf
+    sed -i "s|^group = nobody|group = ${PHP_USER}|g" /etc/php7/php-fpm.d/www.conf
+    sed -i "s|^pm.max_children =.*|pm.max_children = 20|g" /etc/php7/php-fpm.d/www.conf
+    sed -i "s|^pm.start_servers =.*|pm.start_servers = 4|g" /etc/php7/php-fpm.d/www.conf
+    sed -i "s|^pm.min_spare_servers =.*|pm.min_spare_servers = 4|g" /etc/php7/php-fpm.d/www.conf
+    sed -i "s|^pm.max_spare_servers =.*|pm.max_spare_servers = 16|g" /etc/php7/php-fpm.d/www.conf
+    if [ "$PHP_FPM_DUBUG" == "true" ]; then
+      sed -i "s|^[;]*\s*catch_workers_output =.*|catch_workers_output = yes|g" /etc/php7/php-fpm.d/www.conf
+      sed -i "s|^[;]*\s*access.log\s*=.*|access.log = /proc/self/fd/2|g" /etc/php7/php-fpm.d/www.conf
+      sed -i "s|^[;]*\s*slowlog\s*=.*|slowlog = /proc/self/fd/2|g" /etc/php7/php-fpm.d/www.conf
+      sed -i "s|^[;]*\s*php_admin_value\[error_log\].*|php_admin_value[error_log] = /proc/self/fd/2|g" /etc/php7/php-fpm.d/www.conf
+      sed -i "s|^[;]*\s*php_admin_flag\[log_errors\].*|php_admin_flag[log_errors] = on|g" /etc/php7/php-fpm.d/www.conf
+      sed -i "s|^[;]*\s*access.format =.*|access.format = \"%R – %u %{%Y/%m/%d %H:%M:%S}t \\\"%m %r%Q%q\\\" %s %f %{mili}d %{kilo}M %C%%\"|g" /etc/php7/php-fpm.d/www.conf
+      sed -i "s|^[;]*\s*request_slowlog_timeout =.*|request_slowlog_timeout = 10s|g" /etc/php7/php-fpm.d/www.conf
+    fi
+    printOK $?
+    formatOutput "Initial php configuration file..."
+    sed -i "s|^;\s*session.save_path.*|session.save_path = \"/tmp\"|g" /etc/php7/php.ini
+    printOK $?
+    formatOutput "Repair data directory [${PHP_DATA_DIR}] permissions....."
+    chown ${PHP_USER_UID}.${PHP_USER_UID} ${PHP_DATA_DIR} -R >& /dev/null;
+    printOK $?
+  fi
+}
+

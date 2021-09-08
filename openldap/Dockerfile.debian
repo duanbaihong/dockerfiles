@@ -1,0 +1,100 @@
+FROM debian:jessie
+MAINTAINER dbh888<duanbaihong@qq.com>
+ENV OPENLDAP_VERSION=2.4.47 \
+    OPENLDAP_SHA1=c59d52dd75f7d1c7b02f83725da36c322d439674 \
+    LDAP_ROOT_DOMAIN=monitor \
+    LDAP_DOMAIN="iwubida.com" \
+    LDAP_DEBUG=256 \
+    LDAP_INSTALL_PREFIX=/opt/ldap \
+    LDAP_DATA_DIR=/opt/ldap/data \
+    LDAP_RUN_USER=ldap \
+    LDAP_SSL=True \
+    LDAP_SYNC_PORT=389 \
+    LDAP_ROOT_PASSWORD=duanbai \
+    LDAP_ADMIN_USER=admin \
+    LDAP_ADMIN_PASSWORD=duanbai \
+    LDAP_SYNC_USER=syncuser \
+    LDAP_SYNC_USERPASS=syncuser123 \
+    LDAP_SYNC_SSL=True \
+    LDAP_EMAIL=duanbaihong@qq.com \
+    LDAP_CONF_DIR=/etc/ldap \
+    LDAP_SSL_CONFIG='' \
+    LDAP_MASTER="Master" \
+    LDAP_TLS_VERIFY_CLIENT="try" \
+    TERM=xterm 
+
+COPY smbk5pwd.patch openldap-${OPENLDAP_VERSION}.tgz ldapSshPublicKey.schema ldapSamba.schema slapd.conf.templete slapd_slave.conf.templete /usr/src/
+RUN installDeps='libicu52 libkadm5srv8-heimdal libkrb5-26-heimdal libltdl7 libsasl2-2 libslp1 libssl1.0.0 ca-certificates libodbc1' \
+    && buildDeps='build-essential libperl-dev unixodbc-dev libmysqlclient-dev file groff-base heimdal-dev libdb-dev libicu-dev libltdl-dev libsasl2-dev libslp-dev libssl-dev wget' \
+    && echo "deb http://mirrors.aliyun.com/debian jessie main contrib non-free" > /etc/apt/sources.list \
+    && echo "deb-src http://mirrors.aliyun.com/debian jessie main contrib non-free" >> /etc/apt/sources.list \
+    && echo "deb http://mirrors.aliyun.com/debian jessie-updates main contrib non-free" >> /etc/apt/sources.list \
+    && echo "deb-src http://mirrors.aliyun.com/debian jessie-updates main contrib non-free" >> /etc/apt/sources.list \
+    && echo "deb http://mirrors.aliyun.com/debian-security jessie/updates main contrib non-free" >> /etc/apt/sources.list \
+    && echo "deb-src http://mirrors.aliyun.com/debian-security jessie/updates main contrib non-free" >> /etc/apt/sources.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends $buildDeps $installDeps \
+    && cd /usr/src \
+    # && wget http://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-$OPENLDAP_VERSION.tgz \
+    && echo "$OPENLDAP_SHA1 openldap-$OPENLDAP_VERSION.tgz" | sha1sum -c \
+    && tar xfz openldap-$OPENLDAP_VERSION.tgz \
+    && rm -f openldap-$OPENLDAP_VERSION.tgz \
+    && cd openldap-$OPENLDAP_VERSION \
+    && patch -p1 <../smbk5pwd.patch \
+    &&  ./configure \
+        --prefix=${LDAP_INSTALL_PREFIX} \
+        --datadir=${LDAP_DATA_DIR} \
+        --enable-slapd \
+        --enable-dynacl \
+        --enable-aci \
+        --enable-cleartext \
+        --enable-crypt \
+        --enable-lmpasswd \
+        --enable-spasswd \
+        --enable-modules \
+        --enable-rewrite \
+        --enable-rlookups \
+        --enable-slapi \
+        --enable-slp \
+        --enable-sql=mod \
+        --enable-backends=mod \
+        --enable-bdb=mod \
+        --enable-dnssrv=mod \
+        --enable-hdb=yes \
+        --enable-ldap=yes \
+        --enable-mdb=yes \
+        --enable-monitor=yes \
+        --enable-meta=mod \
+        --enable-null=mod \
+        --enable-passwd=mod \
+        --enable-relay=mod \
+        --enable-sock=mod \
+        --enable-ndb=no \
+        --enable-memberof=mod \
+        --enable-overlays=mod \
+        --enable-accesslog=mod \
+        --enable-refint=mod \
+        --enable-auditlog=mod \
+        --enable-syncprov=mod \
+        --enable-ppolicy=mod \
+        --with-threads \
+        --with-tls \
+        --enable-local \
+    && make -j$(nproc) \
+    && make install \
+    && cd contrib/slapd-modules/smbk5pwd \
+    && make prefix=${LDAP_INSTALL_PREFIX} install \
+    && cd /usr/src \
+    && cp /usr/src/ldapSamba.schema ${LDAP_INSTALL_PREFIX}/etc/openldap/schema/ldapSamba.schema \
+    && cp /usr/src/ldapSshPublicKey.schema ${LDAP_INSTALL_PREFIX}/etc/openldap/schema/ldapSshPublicKey.schema \
+    && cp /usr/src/slapd.conf.templete ${LDAP_INSTALL_PREFIX}/etc/openldap/slapd.conf.templete \
+    && cp /usr/src/slapd_slave.conf.templete ${LDAP_INSTALL_PREFIX}/etc/openldap/slapd_slave.conf.templete \
+    && rm -rf openldap-$OPENLDAP_VERSION ldapSshPublicKey.schema ldapSamba.schema slapd.conf.templete slapd_slave.conf.templete smbk5pwd.patch \
+    && apt-get purge -y --auto-remove $buildDeps \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf  ${LDAP_INSTALL_PREFIX}/libexec/slapd /usr/bin/slapd 
+
+EXPOSE 389 636
+COPY entrypoint.sh init_format /
+VOLUME ["${LDAP_CONF_DIR}", "${LDAP_DATA_DIR}"]
+ENTRYPOINT ["/entrypoint.sh"]

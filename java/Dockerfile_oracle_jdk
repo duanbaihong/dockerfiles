@@ -1,0 +1,41 @@
+FROM alpine:3.11 as oracle_jdk
+MAINTAINER dbh888<duanbaihong@qq.com>
+# ******************设置JAVA变量环境******************
+ENV LANG=C.UTF-8 \
+    GLIBC_VERSION=2.32-r0 \
+    PS1='[\u@\w]$'
+# ADD java-1.8.232.tar.gz /opt/
+
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add tzdata bash\
+    && cp -rf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo \
+        "-----BEGIN PUBLIC KEY-----\
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApZ2u1KJKUu/fW4A25y9m\
+        y70AGEa/J3Wi5ibNVGNn1gT1r0VfgeWd0pUybS4UmcHdiNzxJPgoWQhV2SSW1JYu\
+        tOqKZF5QSN6X937PTUpNBjUvLtTQ1ve1fp39uf/lEXPpFpOPL88LKnDBgbh7wkCp\
+        m2KzLVGChf83MS0ShL6G9EQIAUxLm99VpgRjwqTQ/KfzGtpke1wqws4au0Ab4qPY\
+        KXvMLSPLUp7cfulWvhmZSegr5AdhNw5KNizPqCJT8ZrGvgHypXyiFvvAH5YRtSsc\
+        Zvo9GI2e2MaZyo9/lvb+LbLEJZKEQckqRj4P26gmASrZEPStwc+yqy1ShHLA0j6m\
+        1QIDAQAB\
+        -----END PUBLIC KEY-----" | sed 's/   */\n/g' > /etc/apk/keys/sgerrand.rsa.pub \
+    && GLIBC_BASE_URL=https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk \
+    && GLIBC_BIN_URL=https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-bin-${GLIBC_VERSION}.apk \
+    && GLIBC_I18N_URL=https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-i18n-${GLIBC_VERSION}.apk \
+    && funwget() { wget -c -t 0 $1; if [ $? -ne 0 ]; then funwget $1; fi }; \
+    for item in ${GLIBC_BASE_URL} ${GLIBC_BIN_URL} ${GLIBC_I18N_URL}; do funwget $item; done \
+    && apk add *.apk \
+    && rm -rf /var/cache/apk/* /etc/apk/keys/sgerrand.rsa.pub /tmp/* *.apk
+
+
+
+FROM oracle_jdk
+MAINTAINER dbh888<duanbaihong@qq.com>
+ARG  JAVA_INSTALL=/a/apps/java
+ENV  ORACLE_JDK_URL=http://test2-auto-test.xiujiadian.com/files/java-1.8.0-301.tar.gz \
+     JAVA_HOME=$JAVA_INSTALL \
+     PATH=$JAVA_INSTALL/bin:$PATH \
+     CLASSPATH=.:$JAVA_INSTALL/lib/dt.jar:$JAVA_INSTALL/lib/tools.jar
+
+RUN mkdir -p /a/apps/; cd /a/apps/;rm -rf /opt/java;funwget() { wget -c -t 0 $1 -O - |tar -zxf -; if [ $? -ne 0 ]; then echo $1;funwget $1; fi }; \
+    for item in ${ORACLE_JDK_URL}; do funwget $item; done;

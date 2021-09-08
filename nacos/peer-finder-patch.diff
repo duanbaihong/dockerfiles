@@ -1,0 +1,39 @@
+diff --git a/peer-finder.go b/peer-finder.go
+index 33b78cc..9d48d70 100644
+--- a/peer-finder.go
++++ b/peer-finder.go
+@@ -40,7 +40,7 @@ import (
+ )
+ 
+ const (
+-	pollPeriod = 1 * time.Second
++	pollPeriod = 2 * time.Second
+ )
+ 
+ type AddressType string
+@@ -344,13 +344,22 @@ func run(stopCh <-chan struct{}) error {
+ 				continue
+ 			}
+ 		} else {
+-			newPeers, err = lookupDNS(*svc)
++			//newPeers, err = lookupDNS(*svc)
++			newPeers, err = lookupHostIPs(*svc)
+ 			if err != nil {
+ 				log.Info(err.Error())
+ 				continue
+ 			}
+-			if newPeers.Equal(peers) || !newPeers.Has(myName) {
+-				log.Info("have not found myself in list yet.", "hostname", myName, "hosts in list", strings.Join(newPeers.List(), ", "))
++			if newPeers.Equal(peers) {
++				var myIP sets.String
++				myIP, err = lookupHostIPs(myName)
++				if err != nil {
++					log.Info(err.Error())
++					continue
++				}
++				if !newPeers.HasAny(myIP.List()...) {
++					log.Info("have not found myself in list yet.", "hostname", myName, "hosts in list", strings.Join(newPeers.List(), ", "))
++				}
+ 				continue
+ 			}
+ 		}

@@ -1,0 +1,28 @@
+FROM anapsix/alpine-java:latest
+ARG ROCKETMQ_PREFIX=/a/apps/rocketmq
+MAINTAINER dbh888 <duanbaihong@qq.com>
+
+ENV PATH=$PATH:/opt/jdk/bin \
+    JAVA_HOME=/opt/jdk/ \
+    ROCKETMQ_VERSION=4.7.1 \
+    ROCKETMQ_PREFIX=${ROCKETMQ_PREFIX}/ \
+    JVM_OPTS="" \
+    ROCKETMQ_ARGS="" \
+    PS1='[\u@\w]$' 
+
+ADD entrypoint-rocketmq-namesrv.sh entrypoint-rocketmq-broker.sh ${ROCKETMQ_PREFIX}
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add bash dumb-init gettest \
+    && funwget() { wget -c -t 0 $1 ;if [ $? -ne 0 ]; then echo $1;funwget $1; fi } \
+    && funwget https://archive.apache.org/dist/rocketmq/${ROCKETMQ_VERSION}/rocketmq-all-${ROCKETMQ_VERSION}-bin-release.zip \
+    && unzip rocketmq-all-${ROCKETMQ_VERSION}-bin-release.zip \
+    && mv rocketmq-all-${ROCKETMQ_VERSION}-bin-release/* $ROCKETMQ_PREFIX \
+    && rm -rf rocketmq-all-${ROCKETMQ_VERSION}-bin-release rocketmq-all-${ROCKETMQ_VERSION}-bin-release.zip \
+    && chmod +x ${ROCKETMQ_PREFIX}/*.sh \
+    && mv ${ROCKETMQ_PREFIX}/*.sh /bin/ \
+    && cd ${ROCKETMQ_PREFIX}/ \
+    && rm -rf LICENSE NOTICE README.md benchmark
+EXPOSE  9876 10911 10909
+WORKDIR ${ROCKETMQ_PREFIX}/
+
+

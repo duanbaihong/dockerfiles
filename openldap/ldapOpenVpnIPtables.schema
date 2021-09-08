@@ -1,0 +1,21 @@
+#
+# LDAP Public Key Patch schema for use with openssh-ldappubkey
+#                              useful with PKA-LDAP also
+# Adjusted: dbh888 <duanbaihong@qq.com>
+#           Making the uid a MUST, but the sshPublicKey a MAY
+#           so we can add the objectClass and later add the key
+# Author: dbh888 <duanbaihong@qq.com>
+# Based on the proposal of : dbh888
+#
+
+attributetype ( 1.3.6.1.4.1.7.1.2.1.1 NAME 'iptableItems'
+    DESC 'MANDATORY: iptableItems Items'
+    EQUALITY caseIgnoreMatch
+    SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+
+objectclass ( 1.3.6.1.4.1.7.1.2.2.1 NAME 'ldapOpenVpnIptables'
+    DESC 'MANDATORY: ldapOpenVpnIptables objectclass'
+    SUP groupOfUniqueNames STRUCTURAL
+    MUST ( uniqueMember $ cn $ iptableItems )
+    MAY (  ou $ description ) 
+    )

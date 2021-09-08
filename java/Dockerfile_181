@@ -1,0 +1,22 @@
+FROM alpine:latest
+MAINTAINER dbh888<duanbaihong@qq.com>
+
+ENV APP_NAME='' \
+	PORT='' \
+	PROFILES_ACTIVE='' \
+	RUN_MODE='' \
+	LOG_PATH='/logs' \
+	REMOTE_PORT='' \
+	JVM_PARAM='' \
+	JVM_MEN='' 
+ADD MSYH.TTC MSYHBD.TTC MSYHL.TTC /usr/share/fonts/
+ADD entrypoint.sh init_format /
+
+RUN apk update && apk add openjdk8 curl bash
+
+
+
+# ******************设置JAVA变量环境******************
+ENV JAVA_HOME=/usr/lib/jvm/java-1.8-openjdk CLASSPATH=$JAVA_HOME/bin PATH=.:$JAVA_HOME/bin:$PATH
+
+# ENTRYPOINT ["/entrypoint.sh"]

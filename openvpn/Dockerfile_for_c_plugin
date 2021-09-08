@@ -1,0 +1,61 @@
+FROM alpine:3.11
+MAINTAINER dbh888<duanbaihong@qq.com>
+ARG OPENVPN_INSTALL=/opt/openvpn
+ENV EMAIL=duanbaihong@qq.com \
+    OPENVPN_VERSION=2.5.1 \
+    OPENVPN_LDAP_PLUGIN_VERSION=1.0.7 \
+    OPENVPN_PLUGINTYPE=c \
+    OPENVPN_PROTO='tcp' \
+    OPENVPN_PORT='1194' \
+    OPENVPN_DEV='tun' \
+    OPENVPN_PREFIX=$OPENVPN_INSTALL \
+    OPENVPN_NETADDR=10.10.0.0/24 \
+    OPENVPN_DOMAIN=openvpn.zmn.cn \
+    OPENVPN_USERID=1000 \
+    OPENVPN_USER=openvpn \
+    XTABLES_LIBDIR=/usr/lib/xtables/ \
+    PATH=$OPENVPN_INSTALL/bin:$OPENVPN_INSTALL/sbin:$PATH \
+    PS1='[\u@\w]$'
+ADD server.conf openvpn-timeformat.patch config.yaml entrypoint.sh init_openvpn ${OPENVPN_PREFIX}/example/
+
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && installDeps='gcc make autoconf upx automake g++ linux-headers linux-pam-dev zlib-dev libc-utils lzo-dev lz4-dev openssl-dev libtool yaml-dev openssl-libs-static openldap-dev' \
+    && appPkg='iptables sudo lzo lz4-libs libldap yaml bc openssl' \
+    && apk add --no-cache ${installDeps} ${appPkg} \
+    && cd /tmp/ \
+    && OPENVPN_DOWNLOAD_URL=https://github.com/OpenVPN/openvpn/archive/v${OPENVPN_VERSION}.tar.gz \
+    && OPENVPN_LDAP_AUTH_URL=https://github.com/duanbaihong/openvpn-ldap-auth/archive/v${OPENVPN_LDAP_PLUGIN_VERSION}.tar.gz \
+    && funwget() { wget -c -t 0 $1 -O - |tar -zxf -; if [ $? -ne 0 ]; then funwget $1; fi }; \
+    for item in ${OPENVPN_DOWNLOAD_URL} ${OPENVPN_LDAP_AUTH_URL}; do funwget $item; done \
+    && cd openvpn-$OPENVPN_VERSION \
+    && autoreconf -i -v -f \
+    && patch -p1 < ${OPENVPN_PREFIX}/example/openvpn-timeformat.patch \
+    && ./configure --prefix=${OPENVPN_PREFIX} \
+       --enable-static\
+       --enable-async-push \
+       --enable-iproute2 \
+       --enable-pam-dlopen \
+       OPENSSL_LIBS='-lssl -lcrypto'\
+    && make \
+    && cp doc/openvpn.8.rst doc/openvpn.8 \
+    && make install \
+    && cd ../openvpn-ldap-auth-${OPENVPN_LDAP_PLUGIN_VERSION} \
+    && autoreconf -i -v -f \
+    && ./configure --prefix=${OPENVPN_PREFIX} CPPFLAGS=-I${OPENVPN_PREFIX}/include/ \
+    && make install \
+    && upx -9 ${OPENVPN_PREFIX}/sbin/openvpn \
+    && apk del ${installDeps} ${installDeps2}\
+    && rm -rf /var/cache/apk/* \
+    && cp -rf ${OPENVPN_PREFIX}/example/entrypoint.sh ${OPENVPN_PREFIX}/example/init_openvpn /bin/ \
+    && mkdir ${OPENVPN_PREFIX}/etc ${OPENVPN_PREFIX}/run ${OPENVPN_PREFIX}/logs -p \
+    && rm -rf /tmp/* /root/.cache \
+    && echo -e "[ ca ]\ndefault_ca= CA_default\n[ CA_default ]\ndir= /demoCA\ncerts= \$dir/certs\ncrl_dir= \$dir/crl\ndatabase= \
+\$dir/index.txt\nnew_certs_dir= \$dir/newcerts\ncertificate= \$dir/cacert.pem \nserial= \$dir/serial\npolicy= policy_match\n\
+default_md= default\nunique_subject=no\n\
+[ policy_match ]\ncountryName= match\nstateOrProvinceName= match\norganizationName= match\norganizationalUnitName= optional\n\
+commonName= supplied\nemailAddress= optional\n">>/etc/ssl/openssl.cnf
+
+VOLUME ["$OPENVPN_PREFIX"]
+EXPOSE 1194 1195
+WORKDIR ${OPENVPN_PREFIX}/
+ENTRYPOINT ["/bin/entrypoint.sh"]

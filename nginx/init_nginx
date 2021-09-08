@@ -1,0 +1,250 @@
+#/bin/sh
+
+function printOK() {
+  if [ $1 -ne 0 ]; then
+    echo -e "[\033[33mFailed\033[0m]"
+  else
+    echo -e "[\033[32m  OK  \033[0m]"
+  fi
+}
+function formatOutput() {
+  width=120
+  str=""
+  arg=$1
+  if [ "$arg" == "title" ]; then
+    for i in `seq 1 $(expr $width + 8)`
+    do
+      str="${str}#"
+    done
+    echo $str
+    return 0
+  fi
+  reparg=`echo $arg|sed 's|\\\033\[[0-9]*m||g'`
+  if [ -n "$2" ]; then
+    reparg2=`echo $2|sed 's|\\\033\[[0-9]*m||g'`
+    argLen=$(expr ${width} - ${#reparg} - ${#reparg2} + 6)
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -e "\033[36m$1$tab$2\033[0m"
+    return 0
+  else
+    argLen=$(expr ${width} - ${#reparg})
+    tab=""
+    for b in `seq 1 ${argLen}`
+    do
+      tab="$tab "
+    done
+    echo -en "$arg$tab"
+  fi
+}
+# 启用consul-template 配置同步
+function InitConsulTemplate() {
+  formatOutput "Generate 'consul-template' template file [\033[31m${NGINX_PREFIX}/conf/consul_template/nginx_virtual.ctmpl\033[0m]...."
+  cat <<EOF>${NGINX_PREFIX}/conf/consul_template/nginx_virtual.ctmpl
+# 配置更新时间{{ timestamp }} 此timestamp为重点，不然更新配置后不能执行更新命令
+{{range ls "/nginx/conf.d/certs" }}{{ \$cert := printf "${NGINX_PREFIX}/conf/cert/%s" .Key }}{{.Value | toFile \$cert}}{{end}}
+{{range ls "/nginx/conf.d/deploy" }}{{ \$deploy := printf "${NGINX_PREFIX}/conf/conf.d/deploy/%s" .Key }}{{.Value | toFile \$deploy}}{{end}}
+{{range ls "/nginx/conf.d/stream" }}{{ \$stream := printf "${NGINX_PREFIX}/conf/conf.d/stream/%s" .Key}}{{.Value | toFile \$stream }}{{end}}
+EOF
+  printOK $?
+  formatOutput "Generate 'consul-template' main profile [\033[31m${NGINX_PREFIX}/conf/consul-template.cnf\033[0m]...."
+  cat <<EOF>${NGINX_PREFIX}/conf/consul-template.cnf
+consul {
+  address = "${CONSUL_ADDRESS}"
+  token = "${CONSUL_TOKEN}"
+}
+ 
+pid_file = "${NGINX_PREFIX}/logs/consul-template.pid"
+log_level = "DEBUG"
+ 
+template {   
+  source = "${NGINX_PREFIX}/conf/consul_template/nginx_virtual.ctmpl"  
+  destination = "${NGINX_PREFIX}/conf/conf.d/deploy/vhosts.conf"
+  command = "/bin/sh -c '${NGINX_PREFIX}/sbin/nginx -t && ${NGINX_PREFIX}/sbin/nginx -s reload;exit 0'"
+  wait {
+    min = "5s"
+    max = "10s"
+  }
+}
+EOF
+  printOK $?
+}
+
+# 生成配置文件
+function initConfig() {
+  NGINX_CPU_NUM=`cat /proc/cpuinfo| grep "processor"| wc -l`
+  mkdir ${NGINX_PREFIX}/conf/conf.d/deploy ${NGINX_PREFIX}/conf/conf.d/stream ${NGINX_PREFIX}/conf/consul_template ${NGINX_PREFIX}/conf/cert -p
+  if [ ! -s "${NGINX_PREFIX}/conf/nginx.conf"  ]; then
+    #statements
+    formatOutput "Generate the main configuration file [\033[31m${NGINX_PREFIX}/conf/nginx.conf\033[0m]...."
+    cat <<EOF>${NGINX_PREFIX}/conf/nginx.conf
+user                              ${NGINX_USER};
+worker_processes                  ${NGINX_CPU_NUM};
+
+pid                               ${NGINX_PREFIX}/logs/nginx.pid;
+error_log                         /dev/stderr         notice;
+error_log                         /dev/stderr         notice;
+worker_rlimit_nofile              65535;
+# 加载扩展模块，需要时启用
+# load_module                       modules/*.so;
+
+events {
+    worker_connections            65535;
+    use                           epoll;
+    multi_accept                  on;
+}
+
+
+
+http {
+    include                       mime.types;
+    default_type                  application/octet-stream;
+
+    keepalive_timeout             65;
+    keepalive_requests            100000;
+    sendfile                      on;
+    tcp_nopush                    on;
+    tcp_nodelay                   on;
+    server_tokens                 off;
+
+    client_body_buffer_size       128k;
+    client_max_body_size          10m;
+    client_header_buffer_size     16k;
+    large_client_header_buffers   4                   32k;
+    output_buffers                1                   32k;
+    postpone_output               1460;
+    client_header_timeout         3m;
+    client_body_timeout           3m;
+    send_timeout                  3m;
+    proxy_connect_timeout         3m;
+    proxy_send_timeout            3m;
+    proxy_read_timeout            3m;
+
+    open_file_cache               max=1000            inactive=20s;
+    open_file_cache_valid         30s;
+    open_file_cache_min_uses      5;
+    open_file_cache_errors        off;
+
+    gzip                          on;
+    gzip_min_length               1000;
+    gzip_buffers                  4                   4k;
+    gzip_types                    application/x-javascript text/css application/javascript text/javascript text/plain text/xml application/json application/vnd.ms-fontobject application/x-font-opentype application/x-font-truetype application/x-font-ttf application/xml font/eot font/opentype font/otf image/svg+xml image/vnd.microsoft.icon;
+    gzip_disable                  "MSIE [1-6]\.";
+
+    log_format main               '\$remote_addr -> \$upstream_addr - \$remote_user [\$time_iso8601]  '
+                                  '"\$request" \$status \$bytes_sent '
+                                  '"\$http_referer" "\$http_user_agent" '
+                                          '"\$gzip_ratio"';
+
+    log_format zmn                '[\$time_iso8601] "\$http_x_forwarded_for" -> "\$remote_addr" -> "\$upstream_addr" "\$remote_user" '
+                                  '"\$request" \$status \$bytes_sent '
+                                  '"\$http_referer" "\$http_user_agent" "\$gzip_ratio" '
+                                  '\$request_time  \$upstream_response_time';
+
+    log_format zmn_json           '{ "@timestamp": "\$time_iso8601", '
+                                  '"referer": "\$http_referer", '
+                                  '"request": "\$request", '
+                                  '"status": \$status, '
+                                  '"bytes": \$bytes_sent, '
+                                  '"agent": "\$http_user_agent", '
+                                  '"x_forwarded": "\$http_x_forwarded_for", '
+                                  '"remote_addr": "\$remote_addr", '
+                                  '"up_addr": "\$upstream_addr",'
+                                  '"up_resp_time": "\$upstream_response_time",'
+                                  '"request_time": "\$request_time"'
+                                  ' }';
+    # [ debug | info | notice | warn | error | crit | alert | emerg ]
+    # error_log                     logs/error.log     warn;
+    error_log                     /dev/stderr        warn;
+    access_log                    /dev/stdout        zmn;
+    ########################################
+    # Reverse Proxy Config
+    ########################################
+    proxy_redirect                off;
+    proxy_set_header              X-Forwarded-For   \$remote_addr;
+    proxy_set_header              X-Forwarded-Proto \$scheme;
+    proxy_set_header              Host              \$http_host;
+    proxy_set_header              X-Real-IP         \$remote_addr;
+    proxy_next_upstream           error;
+    port_in_redirect              off;
+    proxy_ignore_client_abort     on;
+    proxy_buffer_size             64k; 
+    proxy_buffers                 8                 64k; 
+    ##### include configs ######
+    vhost_traffic_status_zone;
+
+    include                       conf.d/deploy/*.conf;
+    include                       conf.d/*.conf;
+}
+stream {
+  log_format proxy                '\$remote_addr -> \$upstream_addr [\$time_iso8601] '
+                                  '\$protocol \$status \$bytes_sent \$bytes_received '
+                                  '\$session_time '
+                                  '"\$upstream_bytes_sent" "\$upstream_bytes_received" "\$upstream_connect_time"';
+
+   access_log                     logs/tcp-access.log proxy ;
+   include                        conf.d/stream/*.conf;
+}
+EOF
+  printOK $?
+  fi
+
+  # 获取本机的IP地址
+  IP_DEVICE=$(ip route | grep default|awk '{print $5}')
+  NGINX_LOCAL_IP_ADDR=$(ip -o -4 addr list ${IP_DEVICE} | head -n1 | awk '{print $4}' | cut -d/ -f1)
+  formatOutput "Generate configuration file for monitoring [\033[31m${NGINX_PREFIX}/conf/conf.d/nginx_status.conf\033[0m]...."
+  cat <<EOF>${NGINX_PREFIX}/conf/conf.d/nginx_status.conf
+server {
+  listen                                    80;
+  server_name                               ${NGINX_LOCAL_IP_ADDR};
+
+  location /ngx_statuss {
+    stub_status                             on;
+    access_log                              off;
+    vhost_traffic_status_display;
+    vhost_traffic_status_display_format     html;
+    allow                                   ${NGINX_LOCAL_IP_ADDR}/32;
+    deny                                    all;
+  }
+  location /ngx_status {
+    access_log                              off;
+    stub_status                             on;
+    allow                                   ${NGINX_LOCAL_IP_ADDR}/32;
+    deny                                    all;
+  }
+  location /dynamic {
+    access_log                              /dev/stdout;
+    allow                                   ${NGINX_LOCAL_IP_ADDR}/32;
+    deny                                    all;
+    dynamic_upstream;
+  }
+}
+EOF
+  printOK $?
+  formatOutput "Generate logrotate log auto cut profile [\033[31m/etc/logrotate.d/nginx\033[0m]...."
+  cat <<EOF>/etc/logrotate.d/nginx
+${NGINX_PREFIX}/logs/*.log {
+    daily
+    rotate 15
+    missingok
+    dateext
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    postrotate
+        if [ -f ${NGINX_PREFIX}/logs/nginx.pid ]; then
+            kill -USR1 \`cat ${NGINX_PREFIX}/logs/nginx.pid\`
+        fi
+    endscript
+}
+EOF
+  printOK $?
+  if [ "${ENABLE_CONSUL_TEMPLATE}" == "true" ]; then
+    InitConsulTemplate
+  fi
+}
+

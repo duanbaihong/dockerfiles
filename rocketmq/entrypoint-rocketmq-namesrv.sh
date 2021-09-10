@@ -1,6 +1,10 @@
 #!/usr/bin/dumb-init /bin/bash
 
 java -server \
+-Dfile.encoding=utf-8 \
+-Duser.timezone=Asia/Shanghai \
+-Djava.ext.dirs=${JAVA_HOME}/jre/lib/ext:${ROCKETMQ_PREFIX}/lib:${JAVA_HOME}/lib/ext \
+${JVM_OPTS} \
 -XshowSettings:vm \
 -XX:+UseContainerSupport \
 -XX:MaxRAMPercentage=90.0 \
@@ -22,10 +26,6 @@ java -server \
 -XX:GCLogFileSize=30m \
 -XX:-OmitStackTraceInFastThrow \
 -XX:-UseLargePages \
-${JVM_OPTS} \
--Djava.ext.dirs=${JAVA_HOME}/jre/lib/ext:${ROCKETMQ_PREFIX}/lib:${JAVA_HOME}/lib/ext \
--Dfile.encoding=utf-8 \
--Duser.timezone=Asia/Shangha \
 -cp .:${ROCKETMQ_PREFIX}/conf \
 org.apache.rocketmq.namesrv.NamesrvStartup \
 -c ${ROCKETMQ_PREFIX}/conf/namesrv.conf

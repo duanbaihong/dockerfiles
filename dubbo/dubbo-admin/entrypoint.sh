@@ -4,5 +4,5 @@ java -XshowSettings:vm \
 -XX:+UseContainerSupport \
 -XX:MaxRAMPercentage=90.0 \
 ${JVM_PARAM} \
--jar ${DUBBO_PREFIX}/dubbo-admin-0.0.1-SNAPSHOT.jar 
+-jar ${DUBBO_PREFIX}/dubbo-admin-${DUBBO_VERSION}.jar 
 

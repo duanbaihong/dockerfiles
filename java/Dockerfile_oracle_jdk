@@ -25,8 +25,9 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && funwget() { wget -c -t 0 $1; if [ $? -ne 0 ]; then funwget $1; fi }; \
     for item in ${GLIBC_BASE_URL} ${GLIBC_BIN_URL} ${GLIBC_I18N_URL}; do funwget $item; done \
     && apk add *.apk \
-    && rm -rf /var/cache/apk/* /etc/apk/keys/sgerrand.rsa.pub /tmp/* *.apk
-
+    && rm -rf /var/cache/apk/* /etc/apk/keys/sgerrand.rsa.pub /tmp/* *.apk \
+    && mkdir -p /a/apps/ /a/domains/ /data/appdatas/cat \
+    && adduser -D -g 1000 -u 1000 -h /a/domains/ zmn;chown zmn.zmn /a /data -R 
 
 
 FROM oracle_jdk
@@ -37,5 +38,5 @@ ENV  ORACLE_JDK_URL=http://test2-auto-test.xiujiadian.com/files/java-1.8.0-301.t
      PATH=$JAVA_INSTALL/bin:$PATH \
      CLASSPATH=.:$JAVA_INSTALL/lib/dt.jar:$JAVA_INSTALL/lib/tools.jar
 
-RUN mkdir -p /a/apps/; cd /a/apps/;rm -rf /opt/java;funwget() { wget -c -t 0 $1 -O - |tar -zxf -; if [ $? -ne 0 ]; then echo $1;funwget $1; fi }; \
+RUN cd /a/apps/;funwget() { wget -c -t 0 $1 -O - |tar -zxf -; if [ $? -ne 0 ]; then echo $1;funwget $1; fi }; \
     for item in ${ORACLE_JDK_URL}; do funwget $item; done;

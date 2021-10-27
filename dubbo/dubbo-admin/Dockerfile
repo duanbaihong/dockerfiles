@@ -20,4 +20,3 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 EXPOSE  8080
 WORKDIR ${DUBBO_PREFIX}
 ENTRYPOINT ["/bin/entrypoint.sh"]
-

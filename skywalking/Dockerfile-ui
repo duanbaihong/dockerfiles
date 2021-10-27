@@ -30,17 +30,7 @@
 #     && adduser -D -g 1000 -u 1000 -h /a/domains/ zmn;chown zmn.zmn /a /data -R 
 
 
-FROM ubuntu
+FROM pre-harbor.xiujiadian.com/library/oracle-jdk:v1.8.0-301
 MAINTAINER dbh888<duanbaihong@qq.com>
-ARG  JAVA_INSTALL=/a/apps/java
-ENV  ORACLE_JDK_URL=https://local-files.xiujiadian.com/files/java-11.0.12.tar.gz \
-     JAVA_HOME=$JAVA_INSTALL \
-     PATH=$JAVA_INSTALL/bin:$PATH \
-     CLASSPATH=.:$JAVA_INSTALL/lib/dt.jar:$JAVA_INSTALL/lib/tools.jar
-
-RUN apt update \
-    && apt install wget -y \
-    && apt clean \
-    && rm -rf /var/cache/apt \
-    && cd /a/apps/;funwget() { wget -c -t 0 $1 -O - |tar -zxf -; if [ $? -ne 0 ]; then echo $1;funwget $1; fi }; \
-    for item in ${ORACLE_JDK_URL}; do funwget $item; done;
+ENV PATH=/a/apps/java/bin:/sbin/:/bin:/usr/bin:/usr/local/bin:/usr/sbin
+ADD --chown=zmn skywalking-webapp.jar  /a/domains/skywalking-ui/

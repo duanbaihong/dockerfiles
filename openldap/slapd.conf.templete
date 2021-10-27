@@ -14,9 +14,10 @@ include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/java.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/misc.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/nis.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/openldap.schema
-include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ppolicy.schema
+# include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ppolicy.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/pmi.schema
 # 自定义的samba publickey sudo
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/personRoles.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ldapSshPublicKey.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ldapSshSudo.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ldapSamba.schema
@@ -44,6 +45,7 @@ moduleload      accesslog.la
 moduleload      syncprov.la
 moduleload      refint.la
 moduleload      valsort.la
+moduleload      unique.la
 
 # Sample security restrictions
 #   Require integrity protection (prevent hijacking)
@@ -112,6 +114,7 @@ overlay                ppolicy
 ppolicy_default        cn=default,ou=Policies,@@LDAP_SUFFIX@@
 ppolicy_hash_cleartext TRUE
 ppolicy_use_lockout    TRUE
+# ppolicy_forward_updates
 
 overlay              memberof
 memberof-group-oc    groupOfUniqueNames
@@ -137,6 +140,11 @@ logsuccess  TRUE
 # 每天扫描一次操作日志数据库, 并清除15天前的条目
 logpurge 30+00:00 01+00:00
 
+
+overlay              unique
+unique_attributes    mail uidNumber
+
+
 # limits dn.exact="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited site
 limits dn.exact="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited size.soft=unlimited size.hard=unlimited
 
@@ -146,6 +154,7 @@ rootdn      "cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@"
 suffix      "cn=accesslog"
 index       default eq
 index       entryCSN,objectClass,reqEnd,reqResult,reqStart,reqDN
+
 overlay     syncprov
 syncprov-nopresent  TRUE
 syncprov-reloadhint TRUE

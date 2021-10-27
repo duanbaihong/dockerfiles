@@ -1,0 +1,50 @@
+#
+# LDAP Public Key Patch schema for use with openssh-ldappubkey
+#                              useful with PKA-LDAP also
+# Adjusted: dbh888 <duanbaihong@qq.com>
+#           Making the uid a MUST, but the sshPublicKey a MAY
+#           so we can add the objectClass and later add the key
+# Author: dbh888 <duanbaihong@qq.com>
+# Based on the proposal of : dbh888
+#
+
+attributetype ( 1.3.6.1.4.1.42.2.27.4.1.97
+    NAME 'dingdingId'
+    DESC '钉钉用户唯一ID'
+    EQUALITY caseExactMatch
+    SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+    SINGLE-VALUE )
+
+attributetype ( 1.3.6.1.4.1.42.2.27.4.1.98
+    NAME 'gender'
+    DESC '性别'
+    EQUALITY booleanMatch
+    SYNTAX 1.3.6.1.4.1.1466.115.121.1.7
+    SINGLE-VALUE)
+
+attributetype ( 1.3.6.1.4.1.42.2.27.4.1.99
+    NAME 'qicq'
+    DESC '即时通讯号'
+    SYNTAX 1.3.6.1.4.1.1466.115.121.1.36
+    SINGLE-VALUE)
+
+attributetype ( 1.3.6.1.4.1.42.2.27.4.1.100
+    NAME 'entrydate'
+    DESC '入职日期'
+    SYNTAX 1.3.6.1.4.1.1466.115.121.1.24
+    SINGLE-VALUE )
+
+attributetype ( 1.3.6.1.4.1.42.2.27.4.1.101
+    NAME 'birthday'
+    DESC '出生日期'
+    SYNTAX 1.3.6.1.4.1.1466.115.121.1.24
+    SINGLE-VALUE )
+
+objectclass ( 1.3.6.1.4.1.42.2.27.4.2.88 
+    NAME 'personRoles'
+    DESC 'MANDATORY: personRoles objectclass'
+    SUP ( person $ inetOrgPerson ) 
+    STRUCTURAL
+    MUST ( gender )
+    MAY ( dingdingId $ qicq $ entrydate $ birthday ) 
+    )

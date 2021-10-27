@@ -55,7 +55,6 @@ RUN installDeps='libicu52 libkadm5srv8-heimdal libkrb5-26-heimdal libltdl7 libsa
         --enable-rewrite \
         --enable-rlookups \
         --enable-slapi \
-        --enable-slp \
         --enable-sql=mod \
         --enable-backends=mod \
         --enable-bdb=mod \
@@ -77,9 +76,12 @@ RUN installDeps='libicu52 libkadm5srv8-heimdal libkrb5-26-heimdal libltdl7 libsa
         --enable-auditlog=mod \
         --enable-syncprov=mod \
         --enable-ppolicy=mod \
+        --enable-valsort=mod \
+        --enable-unique=mod \
         --with-threads \
         --with-tls \
         --enable-local \
+        --enable-static=no \
     && make -j$(nproc) \
     && make install \
     && cd contrib/slapd-modules/smbk5pwd \

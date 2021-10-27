@@ -1,7 +1,7 @@
 FROM alpine:3.11
 MAINTAINER dbh888<duanbaihong@qq.com>
 ARG LDAP_PREFIX=/opt/ldap
-ENV OPENLDAP_VERSION=2.5.4 \
+ENV OPENLDAP_VERSION=2.6.0 \
     LDAP_ROOT_DOMAIN=openldap \
     LDAP_DOMAIN="zmn.cn" \
     LDAP_DEBUG=256 \
@@ -28,7 +28,7 @@ ENV OPENLDAP_VERSION=2.5.4 \
     PATH=$LDAP_PREFIX/bin:$LDAP_PREFIX/libexec:$PATH \
     PS1='[\u@\w]$'
 
-ADD ldapSshPublicKey.schema ldapOpenVpnIPtables.schema ldapSamba.schema slapd.conf.templete slapd_slave.conf.templete ldapSshSudo.schema /usr/src/
+ADD ldapSshPublicKey.schema personRoles.schema ldapOpenVpnIPtables.schema ldapSamba.schema slapd.conf.templete slapd_slave.conf.templete ldapSshSudo.schema /usr/src/
 # ADD openldap-$OPENLDAP_VERSION.tgz \
     # ldapSshPublicKey.schema ldapSamba.schema slapd.conf.templete slapd_slave.conf.templete /usr/src/
 
@@ -77,16 +77,19 @@ RUN installDeps='dumb-init cyrus-sasl openssl libltdl libuuid libintl' \
         --enable-syncprov=mod \
         --enable-ppolicy=mod \
         --enable-valsort=mod \
+        --enable-unique=mod \
         --with-threads \
         --with-tls \
         --enable-local \
         --enable-static=no \
+        --enable-wt=no \
     && make -j$(nproc) \
     && make install \
     && cd contrib/slapd-modules/smbk5pwd \
     && make prefix=${LDAP_INSTALL_PREFIX} install \
     && cd /usr/src \
     && cp /usr/src/ldapSamba.schema ${LDAP_INSTALL_PREFIX}/etc/openldap/schema/ldapSamba.schema \
+    && cp /usr/src/personRoles.schema ${LDAP_INSTALL_PREFIX}/etc/openldap/schema/personRoles.schema \
     && cp /usr/src/ldapSshPublicKey.schema ${LDAP_INSTALL_PREFIX}/etc/openldap/schema/ldapSshPublicKey.schema \
     && cp /usr/src/ldapSshSudo.schema ${LDAP_INSTALL_PREFIX}/etc/openldap/schema/ldapSshSudo.schema \
     && cp /usr/src/ldapOpenVpnIPtables.schema ${LDAP_INSTALL_PREFIX}/etc/openldap/schema/ldapOpenVpnIPtables.schema \

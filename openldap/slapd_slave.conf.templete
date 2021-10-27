@@ -14,9 +14,10 @@ include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/java.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/misc.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/nis.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/openldap.schema
-include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ppolicy.schema
+# include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ppolicy.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/pmi.schema
 # 自定义的samba publickey sudo
+include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/personRoles.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ldapSshPublicKey.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ldapSshSudo.schema
 include         @@LDAP_INSTALL_PREFIX@@/etc/openldap/schema/ldapSamba.schema
@@ -44,7 +45,7 @@ moduleload      accesslog.la
 moduleload      syncprov.la
 moduleload      refint.la
 moduleload      valsort.la
-
+moduleload      unique.la
 # Sample security restrictions
 #   Require integrity protection (prevent hijacking)
 #   Require 112-bit (3DES or better) encryption for updates
@@ -104,6 +105,10 @@ index       entryCSN,entryUUID                eq
 index       sudoUser,sudoHost,modifyTimestamp eq
 index       memberOf                          eq
 
+
+overlay              unique
+unique_attributes    mail uidNumber
+
 # alpha-ascend, alpha-descend, numeric-ascend, numeric-descend or weighted
 overlay             valsort
 valsort-attr        uniqueMember ou=Groups,@@LDAP_SUFFIX@@ alpha-ascend
@@ -113,6 +118,7 @@ overlay                ppolicy
 ppolicy_default        cn=default,ou=Policies,@@LDAP_SUFFIX@@
 ppolicy_hash_cleartext TRUE
 ppolicy_use_lockout    TRUE
+ppolicy_forward_updates
 
 overlay              memberof
 memberof-group-oc    groupOfUniqueNames

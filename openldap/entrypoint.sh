@@ -19,9 +19,9 @@
 # LDAP_CONF_DIR=/etc/ldap 配置文件目录
 # LDAP_MASTER="Master" 是否是主，还是从选择Master,Slave
 
-if [ "$1" = "bash" ]; then
-  exec bash
-fi
+# if [ "$1" = "bash" ]; then
+#   exec bash
+# fi
 
 ulimit -n 65535
 . init_openldap

@@ -223,7 +223,7 @@ function init_config() {
   else
     printOK 0
     formatOutput "Repair OPENLDAP directory permissions...."
-    chown -R ${LDAP_RUN_USER}:${LDAP_RUN_USER} ${LDAP_INSTALL_PREFIX} ${LDAP_CONF_DIR}/slapd.d
+    chown -R ${LDAP_RUN_USER}:${LDAP_RUN_USER} ${LDAP_INSTALL_PREFIX} ${LDAP_CONF_DIR}
     printOK $?
     cat <<EOF >${LDAP_CONF_DIR}/ldif/base.ldif
 dn: ${LDAP_SUFFIX}

@@ -1,0 +1,22 @@
+FROM ubuntu:18.04
+MAINTAINER dbh888<duanbaihong@qq.com>
+ARG  JAVA_INSTALL=/a/apps/java
+ENV  ORACLE_JDK_URL=https://local-files.xiujiadian.com/files/java-11.0.12.tar.gz \
+     JAVA_HOME=$JAVA_INSTALL \
+     PATH=$JAVA_INSTALL/bin:$PATH \
+     CLASSPATH=.:$JAVA_INSTALL/lib/dt.jar:$JAVA_INSTALL/lib/tools.jar
+
+RUN echo 'deb http://mirrors.aliyun.com/ubuntu/ bionic main restricted universe multiverse' >/etc/apt/sources.list \
+    && echo 'deb http://mirrors.aliyun.com/ubuntu/ bionic-security main restricted universe multiverse' >>/etc/apt/sources.list\
+    && echo 'deb http://mirrors.aliyun.com/ubuntu/ bionic-updates main restricted universe multiverse' >>/etc/apt/sources.list\
+    && echo 'deb http://mirrors.aliyun.com/ubuntu/ bionic-proposed main restricted universe multiverse' >>/etc/apt/sources.list\
+    && echo 'deb http://mirrors.aliyun.com/ubuntu/ bionic-backports main restricted universe multiverse' >>/etc/apt/sources.list\
+    && apt update \
+    && apt install wget -y \
+    && apt clean \
+    && rm -rf /var/cache/apt \
+    && mkdir -p /a/apps/ /a/domains/ /data/appdatas/cat \
+    && cd /a/apps/;funwget() { wget -c -t 0 $1 -O - |tar -zxf -; if [ $? -ne 0 ]; then echo $1;funwget $1; fi }; \
+    for item in ${ORACLE_JDK_URL}; do funwget $item; done \
+    && addgroup --gid 1000 zmn \
+    && useradd  --gid 1000 --uid 1000 --home /a/domains/ zmn;chown zmn.zmn /a /data -R 

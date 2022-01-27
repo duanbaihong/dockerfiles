@@ -2,7 +2,7 @@ FROM alpine:3.11
 MAINTAINER dbh888<duanbaihong@qq.com>
 ARG OPENVPN_INSTALL=/opt/openvpn
 ENV EMAIL=duanbaihong@qq.com \
-    OPENVPN_VERSION=2.5.1 \
+    OPENVPN_VERSION=2.5.5 \
     OPENVPN_LDAP_PLUGIN_VERSION=1.0.7 \
     OPENVPN_PLUGINTYPE=c \
     OPENVPN_PROTO='tcp' \
@@ -19,8 +19,8 @@ ENV EMAIL=duanbaihong@qq.com \
 ADD server.conf openvpn-timeformat.patch config.yaml entrypoint.sh init_openvpn ${OPENVPN_PREFIX}/example/
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
-    && installDeps='gcc make autoconf upx automake g++ linux-headers linux-pam-dev zlib-dev libc-utils lzo-dev lz4-dev openssl-dev libtool yaml-dev openssl-libs-static openldap-dev' \
-    && appPkg='iptables sudo lzo lz4-libs libldap yaml bc openssl' \
+    && installDeps='gcc make autoconf upx automake g++ linux-headers py3-docutils linux-pam-dev zlib-dev libc-utils lzo-dev lz4-dev openssl-dev libtool yaml-dev openssl-libs-static openldap-dev' \
+    && appPkg='iptables sudo lzo lz4-libs libldap yaml bc openssl bash' \
     && apk add --no-cache ${installDeps} ${appPkg} \
     && cd /tmp/ \
     && OPENVPN_DOWNLOAD_URL=https://github.com/OpenVPN/openvpn/archive/v${OPENVPN_VERSION}.tar.gz \

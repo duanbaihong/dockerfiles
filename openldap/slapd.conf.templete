@@ -149,6 +149,7 @@ unique_attributes    mail uidNumber
 limits dn.exact="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited size.soft=unlimited size.hard=unlimited
 
 database    mdb
+maxsize     10737418240
 directory   @@LDAP_DATA_DIR@@/accesslog
 rootdn      "cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@"
 suffix      "cn=accesslog"

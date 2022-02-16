@@ -12,7 +12,6 @@ if [ ! -f "${OPENVPN_PREFIX}/etc/certs/ca/ca.crt" ] \
     mkdir ${OPENVPN_PREFIX}/etc/certs/ca \
     ${OPENVPN_PREFIX}/etc/certs/server \
     ${OPENVPN_PREFIX}/etc/certs/client \
-    ${OPENVPN_PREFIX}/etc/ccd -p
     CreatCerts
 fi
 if [ "${OPENVPN_PLUGINTYPE}" != "c" ]; then
@@ -31,7 +30,9 @@ if [ ! -f "${OPENVPN_PREFIX}/etc/server.conf" ]; then
    init_config
 fi
 
-
+if [ ! -d "${OPENVPN_PREFIX}/etc/ccd" ]; then
+   mkdir ${OPENVPN_PREFIX}/etc/ccd -p
+fi
 id ${OPENVPN_USER} &>/dev/null 2>&1
 if [ $? -ne 0 ]; then
     #statements

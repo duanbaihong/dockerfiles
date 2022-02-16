@@ -19,7 +19,7 @@ ENV EMAIL=duanbaihong@qq.com \
 ADD server.conf openvpn-timeformat.patch config.yaml entrypoint.sh init_openvpn ${OPENVPN_PREFIX}/example/
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
-    && installDeps='gcc make autoconf upx automake g++ linux-headers py3-docutils linux-pam-dev zlib-dev libc-utils lzo-dev lz4-dev openssl-dev libtool yaml-dev openssl-libs-static openldap-dev' \
+    && installDeps='gcc make autoconf upx automake g++ linux-headers linux-pam-dev zlib-dev libc-utils lzo-dev lz4-dev openssl-dev libtool yaml-dev openssl-libs-static openldap-dev' \
     && appPkg='iptables sudo lzo lz4-libs libldap yaml bc openssl bash' \
     && apk add --no-cache ${installDeps} ${appPkg} \
     && cd /tmp/ \
@@ -36,15 +36,13 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
        --enable-iproute2 \
        --enable-pam-dlopen \
        OPENSSL_LIBS='-lssl -lcrypto'\
-    && make \
-    && cp doc/openvpn.8.rst doc/openvpn.8 \
     && make install \
-    && cd ../openvpn-ldap-auth-${OPENVPN_LDAP_PLUGIN_VERSION} \
+    || cd ../openvpn-ldap-auth-${OPENVPN_LDAP_PLUGIN_VERSION} \
     && autoreconf -i -v -f \
     && ./configure --prefix=${OPENVPN_PREFIX} CPPFLAGS=-I${OPENVPN_PREFIX}/include/ \
     && make install \
     && upx -9 ${OPENVPN_PREFIX}/sbin/openvpn \
-    && apk del ${installDeps} ${installDeps2}\
+    && apk del ${installDeps}\
     && rm -rf /var/cache/apk/* \
     && cp -rf ${OPENVPN_PREFIX}/example/entrypoint.sh ${OPENVPN_PREFIX}/example/init_openvpn /bin/ \
     && mkdir ${OPENVPN_PREFIX}/etc ${OPENVPN_PREFIX}/run ${OPENVPN_PREFIX}/logs -p \
@@ -56,6 +54,6 @@ default_md= default\nunique_subject=no\n\
 commonName= supplied\nemailAddress= optional\n">>/etc/ssl/openssl.cnf
 
 VOLUME ["$OPENVPN_PREFIX"]
-EXPOSE 1194 1195
+EXPOSE 1194/udp 1194 1195
 WORKDIR ${OPENVPN_PREFIX}/
 ENTRYPOINT ["/bin/entrypoint.sh"]

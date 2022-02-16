@@ -1,0 +1,1 @@
+#!/usr/bin/dumb-init /bin/bash

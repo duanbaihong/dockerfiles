@@ -23,3 +23,5 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 ADD entrypoint.sh ${CANEL_PREFIX}/bin
 
 EXPOSE  8089 11111 11110
+
+ENTRYPOINT ["/${CANEL_PREFIX}/bin/entrypoint.sh"]

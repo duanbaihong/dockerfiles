@@ -57,15 +57,15 @@ in
 esac
 
 str=`file -L $JAVA | grep 64-bit`
-if [ ! -n "$JAVA_OPTS" ]; then
-    if [ -n "$str" ]; then
-        JAVA_OPTS="-server -Xms2048m -Xmx3072m"
-    else
-        JAVA_OPTS="-server -Xms1024m -Xmx1024m"
-    fi
-fi
+# if [ ! -n "$JAVA_OPTS" ]; then
+#     if [ -n "$str" ]; then
+#         JAVA_OPTS="-server -Xms2048m -Xmx3072m"
+#     else
+#         JAVA_OPTS="-server -Xms1024m -Xmx1024m"
+#     fi
+# fi
 
-JAVA_OPTS="$JAVA_OPTS -XX:+UseG1GC -XX:MaxGCPauseMillis=250 -XX:+UseGCOverheadLimit -XX:+ExplicitGCInvokesConcurrent -XX:+PrintAdaptiveSizePolicy -XX:+PrintTenuringDistribution"
+JAVA_OPTS="$JAVA_OPTS -XshowSettings:vm -XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0 -XX:SurvivorRatio=3 -XX:+UseG1GC -XX:MaxGCPauseMillis=250 -XX:+UseGCOverheadLimit -XX:+ExplicitGCInvokesConcurrent -XX:+PrintAdaptiveSizePolicy -XX:+PrintTenuringDistribution"
 JAVA_OPTS=" $JAVA_OPTS -Djava.awt.headless=true -Djava.net.preferIPv4Stack=true -Dfile.encoding=UTF-8"
 CANAL_OPTS="-DappName=canal-admin"
 

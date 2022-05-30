@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="info">
+<!--     <Properties>
+        <Property name="log-path">${sys:oap.logDir}</Property>
+    </Properties>
+    <Appenders>
+        <RollingFile name="RollingFile" fileName="${log-path}/skywalking-oap-server.log"
+                     filePattern="${log-path}/skywalking-oap-server-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout>
+                <pattern>%d - %c - %L [%t] %-5p %x - %m%n</pattern>
+            </PatternLayout>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="102400KB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+    </Appenders> -->
+    <Appenders>
+        <!-- 默认打印到控制台 -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <!-- 默认打印格式 -->
+            <PatternLayout>
+                <pattern>%d - %c - %L [%t] %-5p %x - %m%n</pattern>
+            </PatternLayout>
+        </Console>
+    </Appenders>
+
+    <Loggers>
+        <logger name="org.eclipse.jetty" level="INFO"/>
+        <logger name="org.apache.zookeeper" level="INFO"/>
+        <logger name="io.grpc.netty" level="INFO"/>
+        <Root level="info">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

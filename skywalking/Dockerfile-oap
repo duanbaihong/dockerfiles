@@ -1,0 +1,41 @@
+FROM alpine as skywalking
+ENV PATH=$PATH:/opt/jdk/bin \
+    JAVA_HOME=/opt/jdk/ \
+    SKYWALKING_VERSION=8.7.0
+
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && cd /opt \
+    && funwget() { wget -c -t 0 $1 -O - |tar -zxf -; if [ $? -ne 0 ]; then echo $1;funwget $1; fi } \
+    && funwget https://archive.apache.org/dist/skywalking/${SKYWALKING_VERSION}/apache-skywalking-apm-es7-${SKYWALKING_VERSION}.tar.gz \
+    && mv apache-skywalking* skywalking 
+
+FROM anapsix/alpine-java:latest
+ARG  SKYWALKING_PREFIX=/a/apps/skywalking
+MAINTAINER dbh888 <duanbaihong@qq.com>
+
+ENV PATH=$PATH:/opt/jdk/bin \
+    JAVA_HOME=/opt/jdk/ \
+    SKYWALKING_PREFIX=${SKYWALKING_PREFIX}/ \
+    JAVA_OPTS="" \
+    SKYWALKING_ARGS="" \
+    PS1='[\u@\w]$'
+
+WORKDIR $SKYWALKING_PREFIX
+
+COPY --from=skywalking /opt/skywalking  $SKYWALKING_PREFIX/
+
+ADD entrypoint-skywalking.sh log4j2.xml /bin/
+
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add bash dumb-init \
+    && mv /bin/log4j2.xml $SKYWALKING_PREFIX/config/ \
+    && rm -rf $SKYWALKING_PREFIX/webapp \
+    $SKYWALKING_PREFIX/config-examples \
+    $SKYWALKING_PREFIX/agent \
+    $SKYWALKING_PREFIX/LICENSE \
+    $SKYWALKING_PREFIX/NOTICE \
+    $SKYWALKING_PREFIX/README.txt
+
+EXPOSE 11800 12800
+
+ENTRYPOINT [ "/bin/entrypoint-skywalking.sh" ]

@@ -7,7 +7,7 @@ java -server \
 ${JVM_OPTS} \
 -XshowSettings:vm \
 -XX:+UseContainerSupport \
--XX:MaxRAMPercentage=90.0 \
+-XX:MaxRAMPercentage=70.0 \
 -XX:MetaspaceSize=128m \
 -XX:MaxMetaspaceSize=320m \
 -XX:+UseConcMarkSweepGC \
@@ -19,7 +19,6 @@ ${JVM_OPTS} \
 -XX:SurvivorRatio=8 \
 -XX:-UseParNewGC \
 -verbose:gc \
--Xloggc:/dev/shm/rmq_srv_gc_%p_%t.log \
 -XX:+PrintGCDetails \
 -XX:+UseGCLogFileRotation \
 -XX:NumberOfGCLogFiles=5 \

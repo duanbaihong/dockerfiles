@@ -5,14 +5,13 @@ do
 done
 
 java -server \
--verbose:gc \
--Xloggc:/dev/shm/rmq_broker_gc_%p_%t.log \
 -XshowSettings:vm \
 -XX:+UseContainerSupport \
--XX:MaxRAMPercentage=90.0 \
+-XX:MaxRAMPercentage=70.0 \
 -XX:G1HeapRegionSize=16m \
 -XX:G1ReservePercent=25 \
 -XX:InitiatingHeapOccupancyPercent=30 \
+-verbose:gc \
 -XX:SoftRefLRUPolicyMSPerMB=0 \
 -XX:+PrintGCDetails \
 -XX:+PrintGCDateStamps \

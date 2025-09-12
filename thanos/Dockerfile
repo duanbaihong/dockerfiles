@@ -1,6 +1,6 @@
 FROM alpine:latest
 MAINTAINER dbh888<duanbaihong@qq.com>
-ENV THANOS_VERSION=0.28.0 \
+ENV THANOS_VERSION=0.39.2 \
     THANOS_INSTALL=/a/apps/thanos \
     PS1='[\u@\w]$'
 

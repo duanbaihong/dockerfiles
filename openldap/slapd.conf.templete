@@ -127,9 +127,9 @@ overlay              refint
 refint_attributes    member memberof uniqueMember manager owner
 
 overlay              syncprov
-syncprov-checkpoint  20 1
-syncprov-sessionlog  200
-syncprov-nopresent   TRUE
+syncprov-checkpoint  500 10
+syncprov-sessionlog  10000
+#syncprov-nopresent   TRUE
 syncprov-reloadhint  TRUE
 
 # # accesslog overlay definitions for primary db
@@ -157,11 +157,10 @@ index       default eq
 index       entryCSN,objectClass,reqEnd,reqResult,reqStart,reqDN
 
 overlay     syncprov
-syncprov-nopresent  TRUE
+# syncprov-nopresent  TRUE
 syncprov-reloadhint TRUE
 
 
 # Let the replica DN have limitless searches
 # limits dn.exact="cn=syncuser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited size.soft=10000
-limits dn.exact="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited size.soft=unlimited size.hard=unlimited
-
+# limits dn.exact="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited size.soft=unlimited size.hard=unlimited

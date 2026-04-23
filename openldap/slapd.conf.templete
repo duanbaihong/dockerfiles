@@ -129,7 +129,7 @@ refint_attributes    member memberof uniqueMember manager owner
 overlay              syncprov
 syncprov-checkpoint  500 10
 syncprov-sessionlog  10000
-#syncprov-nopresent   TRUE
+syncprov-nopresent   FALSE
 syncprov-reloadhint  TRUE
 
 # # accesslog overlay definitions for primary db
@@ -144,23 +144,24 @@ logpurge 30+00:00 01+00:00
 overlay              unique
 unique_attributes    mail uidNumber
 
-
-# limits dn.exact="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited site
-limits dn.exact="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited size.soft=unlimited size.hard=unlimited
+overlay     syncprov
+syncprov-nopresent  TRUE
+syncprov-reloadhint TRUE
 
 database    mdb
 maxsize     10737418240
-directory   @@LDAP_DATA_DIR@@/accesslog
+directory   @@LDAP_DATA_DIR@@/-+
 rootdn      "cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@"
 suffix      "cn=accesslog"
 index       default eq
-index       entryCSN,objectClass,reqEnd,reqResult,reqStart,reqDN
+index       entryCSN,objectClass,reqEnd,reqResult,reqStart,reqDN,reqType,reqAuthzID eq
 
-overlay     syncprov
-# syncprov-nopresent  TRUE
-syncprov-reloadhint TRUE
+
 
 
 # Let the replica DN have limitless searches
 # limits dn.exact="cn=syncuser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited size.soft=10000
 # limits dn.exact="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited size.soft=unlimited size.hard=unlimited
+
+# limits dn.exact="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited site
+limits dn.exact="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@" time.soft=unlimited time.hard=unlimited size.soft=unlimited size.hard=unlimited

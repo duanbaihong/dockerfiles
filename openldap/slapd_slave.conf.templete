@@ -118,23 +118,24 @@ overlay                ppolicy
 ppolicy_default        cn=default,ou=Policies,@@LDAP_SUFFIX@@
 ppolicy_hash_cleartext TRUE
 ppolicy_use_lockout    TRUE
-ppolicy_forward_updates
+# 开启 从的登陆状态同步到 master ，需要 master 开启权限
+# ppolicy_forward_updates  
 
-overlay              memberof
-memberof-group-oc    groupOfUniqueNames
-memberof-member-ad   uniqueMember
-memberof-memberof-ad memberof
-memberof-dangling    ignore
-memberof-refint      TRUE
+# overlay              memberof
+# memberof-group-oc    groupOfUniqueNames
+# memberof-member-ad   uniqueMember
+# memberof-memberof-ad memberof
+# memberof-dangling    ignore
+# memberof-refint      TRUE
 
 overlay              refint
 refint_attributes    member memberof uniqueMember manager owner
 
-overlay              syncprov
-syncprov-checkpoint  20 1
-syncprov-sessionlog  200
+# overlay              syncprov
+# syncprov-checkpoint  500 10
+# syncprov-sessionlog  10000
 
-# syncrepl directives             
+# syncrepl directives
 syncrepl rid=001
     provider=@@LDAP_MASTER_ADDRESS@@:@@LDAP_SYNC_PORT@@
     bindmethod=simple
@@ -145,12 +146,13 @@ syncrepl rid=001
     logfilter="(&(objectClass=auditWriteObject)(reqResult=0))"
     schemachecking=on
     type=refreshAndPersist
-    retry="60 +"
+    retry="5 10 60 +"
     scope=sub
     attrs="*,+"
     syncdata=accesslog
+    keepalive=60:10:30
+    timeout=30
     @@LDAP_SLAVE_SSL_ARGS@@
-        
+
 # Refer updates to the master
 updateref @@LDAP_MASTER_ADDRESS@@
-

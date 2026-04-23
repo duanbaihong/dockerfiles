@@ -21,7 +21,7 @@ ENV OPENLDAP_VERSION=2.4.47 \
     LDAP_SSL_CONFIG='' \
     LDAP_MASTER="Master" \
     LDAP_TLS_VERIFY_CLIENT="try" \
-    TERM=xterm 
+    TERM=xterm
 
 COPY smbk5pwd.patch openldap-${OPENLDAP_VERSION}.tgz ldapSshPublicKey.schema ldapSamba.schema slapd.conf.templete slapd_slave.conf.templete /usr/src/
 RUN installDeps='libicu52 libkadm5srv8-heimdal libkrb5-26-heimdal libltdl7 libsasl2-2 libslp1 libssl1.0.0 ca-certificates libodbc1' \
@@ -94,9 +94,9 @@ RUN installDeps='libicu52 libkadm5srv8-heimdal libkrb5-26-heimdal libltdl7 libsa
     && rm -rf openldap-$OPENLDAP_VERSION ldapSshPublicKey.schema ldapSamba.schema slapd.conf.templete slapd_slave.conf.templete smbk5pwd.patch \
     && apt-get purge -y --auto-remove $buildDeps \
     && rm -rf /var/lib/apt/lists/* \
-    && ln -sf  ${LDAP_INSTALL_PREFIX}/libexec/slapd /usr/bin/slapd 
+    && ln -sf  ${LDAP_INSTALL_PREFIX}/libexec/slapd /usr/bin/slapd
 
 EXPOSE 389 636
-COPY entrypoint.sh init_format /
+COPY entrypoint.sh init_openldap /
 VOLUME ["${LDAP_CONF_DIR}", "${LDAP_DATA_DIR}"]
 ENTRYPOINT ["/entrypoint.sh"]

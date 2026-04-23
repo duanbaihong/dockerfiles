@@ -71,13 +71,13 @@ function CreatCerts() {
              ${LDAP_CONF_DIR}/certs/sync >/dev/null 2>&1
     if [ ! -f "${LDAP_CONF_DIR}/certs/ca/ca.crt" ]; then
       formatOutput "Generating CA Certificates to [${LDAP_CONF_DIR}/certs/ca/]..."
-      openssl genrsa -out ${LDAP_CONF_DIR}/certs/ca/ca.key 2048 >/dev/null 2>&1
+      openssl genrsa -out ${LDAP_CONF_DIR}/certs/ca/ca.key 4096 >/dev/null 2>&1
       yes |head -2|openssl req -new -x509 -days 3650 -subj $SUBJECT -key ${LDAP_CONF_DIR}/certs/ca/ca.key -out ${LDAP_CONF_DIR}/certs/ca/ca.crt >/dev/null 2>&1
       printOK $?
     fi
     if [ ! -f "${LDAP_CONF_DIR}/certs/ca/dhparam.pem" ]; then
       formatOutput "Generating dhparam keyfile to [${LDAP_CONF_DIR}/certs/ca/dhparam.pem]..."
-      openssl dhparam -out ${LDAP_CONF_DIR}/certs/ca/dhparam.pem 2048 >/dev/null 2>&1
+      openssl dhparam -out ${LDAP_CONF_DIR}/certs/ca/dhparam.pem 4096 >/dev/null 2>&1
       printOK $?
     fi
     if [ ! -f "${LDAP_CONF_DIR}/certs/server/server.crt" ]; then
@@ -85,7 +85,7 @@ function CreatCerts() {
       mkdir -p /demoCA/newcerts
       touch /demoCA/index.txt /demoCA/serial
       echo 01 >/demoCA/serial
-      openssl genrsa -out ${LDAP_CONF_DIR}/certs/server/server.key 2048 >/dev/null 2>&1
+      openssl genrsa -out ${LDAP_CONF_DIR}/certs/server/server.key 4096 >/dev/null 2>&1
       openssl req -new -subj $SUBJECT -key ${LDAP_CONF_DIR}/certs/server/server.key -out ${LDAP_CONF_DIR}/certs/server/server.csr >/dev/null 2>&1
       yes|head -2|openssl ca -days 3650 -in ${LDAP_CONF_DIR}/certs/server/server.csr -out ${LDAP_CONF_DIR}/certs/server/server.crt -cert ${LDAP_CONF_DIR}/certs/ca/ca.crt -keyfile ${LDAP_CONF_DIR}/certs/ca/ca.key >/dev/null 2>&1
       printOK $?
@@ -96,7 +96,7 @@ function CreatCerts() {
       mkdir -p /demoCA/newcerts
       touch /demoCA/index.txt /demoCA/index.txtserial
       echo 01 >/demoCA/serial
-      openssl genrsa -out ${LDAP_CONF_DIR}/certs/client/client.key 2048 >/dev/null 2>&1
+      openssl genrsa -out ${LDAP_CONF_DIR}/certs/client/client.key 4096 >/dev/null 2>&1
       openssl req -new -subj $SUBJECT -key ${LDAP_CONF_DIR}/certs/client/client.key -out ${LDAP_CONF_DIR}/certs/client/client.csr >/dev/null 2>&1
       yes|head -2|openssl ca -days 3650 -in ${LDAP_CONF_DIR}/certs/client/client.csr -out ${LDAP_CONF_DIR}/certs/client/client.crt -cert ${LDAP_CONF_DIR}/certs/ca/ca.crt -keyfile ${LDAP_CONF_DIR}/certs/ca/ca.key >/dev/null 2>&1
       printOK $?
@@ -164,7 +164,7 @@ function init_config() {
       LDAP_MASTER_ADDRESS=ldap://$LDAP_ROOT_DOMAIN.$LDAP_DOMAIN
       LDAP_SLAVE_SSL_ARGS=""
   fi
-  adduser -D -H -s /sbin/nologin -u 1000 ${LDAP_RUN_USER} >& /dev/null;
+  adduser -D -H -s /sbin/nologin -u ${LDAP_RUN_USERID} ${LDAP_RUN_USER} >& /dev/null;
   if [ ! -f "${LDAP_CONF_DIR}/slapd.conf" ]; then
     if [ "$LDAP_SSL" == "True" ]; then
       CreatCerts
@@ -280,7 +280,7 @@ pwdAllowUserChange: TRUE
 pwdSafeModify: FALSE
 sn: Default policy
 
-dn: cn=adminPolicy,ou=Policies,dc=zmn,dc=cn
+dn: cn=adminPolicy,ou=Policies,${LDAP_SUFFIX}
 cn: adminPolicy
 objectClass: top
 objectClass: pwdPolicy

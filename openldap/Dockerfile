@@ -1,5 +1,5 @@
-FROM alpine:3.11
-MAINTAINER dbh888<duanbaihong@qq.com>
+FROM harbor.xiujiadian.com/library/alpine:3.18.1
+LABEL maintainer="dbh888<duanbaihong@qq.com>"
 ARG LDAP_PREFIX=/opt/ldap
 ENV OPENLDAP_VERSION=2.6.0 \
     LDAP_ROOT_DOMAIN=openldap \
@@ -30,7 +30,7 @@ ENV OPENLDAP_VERSION=2.6.0 \
 
 ADD ldapSshPublicKey.schema personRoles.schema ldapOpenVpnIPtables.schema ldapSamba.schema slapd.conf.templete slapd_slave.conf.templete ldapSshSudo.schema /usr/src/
 # ADD openldap-$OPENLDAP_VERSION.tgz \
-    # ldapSshPublicKey.schema ldapSamba.schema slapd.conf.templete slapd_slave.conf.templete /usr/src/
+# ldapSshPublicKey.schema ldapSamba.schema slapd.conf.templete slapd_slave.conf.templete /usr/src/
 
 RUN installDeps='dumb-init cyrus-sasl openssl libltdl libuuid libintl' \
     && buildDeps='autoconf gcc g++ icu-dev cyrus-sasl-dev db-dev heimdal-dev heimdal-dev groff file openssl-dev libtool m4 mosquitto-dev unixodbc-dev util-linux-dev make perl-dev' \
@@ -42,47 +42,47 @@ RUN installDeps='dumb-init cyrus-sasl openssl libltdl libuuid libintl' \
     for item in ${OPENLDAP_DOWNLOAD_URL}; do funwget $item; done \
     && cd openldap-$OPENLDAP_VERSION \
     &&  ./configure \
-        --prefix=${LDAP_INSTALL_PREFIX} \
-        --datadir=${LDAP_DATA_DIR} \
-        --enable-slapd \
-        --enable-dynacl \
-        --enable-aci \
-        --enable-cleartext \
-        --enable-crypt \
-        --enable-lmpasswd \
-        --enable-spasswd \
-        --enable-modules \
-        --enable-rewrite \
-        --enable-rlookups \
-        --enable-slapi \
-        --enable-sql=mod \
-        --enable-backends=mod \
-        --enable-bdb=mod \
-        --enable-dnssrv=mod \
-        --enable-hdb=yes \
-        --enable-ldap=yes \
-        --enable-mdb=yes \
-        --enable-monitor=yes \
-        --enable-meta=mod \
-        --enable-null=mod \
-        --enable-passwd=mod \
-        --enable-relay=mod \
-        --enable-sock=mod \
-        --enable-ndb=no \
-        --enable-memberof=mod \
-        --enable-overlays=mod \
-        --enable-accesslog=mod \
-        --enable-refint=mod \
-        --enable-auditlog=mod \
-        --enable-syncprov=mod \
-        --enable-ppolicy=mod \
-        --enable-valsort=mod \
-        --enable-unique=mod \
-        --with-threads \
-        --with-tls \
-        --enable-local \
-        --enable-static=no \
-        --enable-wt=no \
+    --prefix=${LDAP_INSTALL_PREFIX} \
+    --datadir=${LDAP_DATA_DIR} \
+    --enable-slapd \
+    --enable-dynacl \
+    --enable-aci \
+    --enable-cleartext \
+    --enable-crypt \
+    --enable-lmpasswd \
+    --enable-spasswd \
+    --enable-modules \
+    --enable-rewrite \
+    --enable-rlookups \
+    --enable-slapi \
+    --enable-sql=mod \
+    --enable-backends=mod \
+    --enable-bdb=mod \
+    --enable-dnssrv=mod \
+    --enable-hdb=yes \
+    --enable-ldap=yes \
+    --enable-mdb=yes \
+    --enable-monitor=yes \
+    --enable-meta=mod \
+    --enable-null=mod \
+    --enable-passwd=mod \
+    --enable-relay=mod \
+    --enable-sock=mod \
+    --enable-ndb=no \
+    --enable-memberof=mod \
+    --enable-overlays=mod \
+    --enable-accesslog=mod \
+    --enable-refint=mod \
+    --enable-auditlog=mod \
+    --enable-syncprov=mod \
+    --enable-ppolicy=mod \
+    --enable-valsort=mod \
+    --enable-unique=mod \
+    --with-threads \
+    --with-tls \
+    --enable-local \
+    --enable-static=no \
+    --enable-wt=no \
     && make -j$(nproc) \
     && make install \
     && cd contrib/slapd-modules/smbk5pwd \
@@ -100,10 +100,10 @@ RUN installDeps='dumb-init cyrus-sasl openssl libltdl libuuid libintl' \
     && rm -rf /var/cache/apk/*  \
     && ln -sf  ${LDAP_INSTALL_PREFIX}/libexec/slapd /usr/bin/slapd \
     && echo -e "[ ca ]\ndefault_ca= CA_default\n[ CA_default ]\ndir= /demoCA\ncerts= \$dir/certs\ncrl_dir= \$dir/crl\ndatabase= \
-\$dir/index.txt\nnew_certs_dir= \$dir/newcerts\ncertificate= \$dir/cacert.pem \nserial= \$dir/serial\npolicy= policy_match\n\
-default_md= default\nunique_subject=no\n\
-[ policy_match ]\ncountryName= match\nstateOrProvinceName= match\norganizationName= match\norganizationalUnitName= optional\n\
-commonName= supplied\nemailAddress= optional\n">>/etc/ssl/openssl.cnf
+    \$dir/index.txt\nnew_certs_dir= \$dir/newcerts\ncertificate= \$dir/cacert.pem \nserial= \$dir/serial\npolicy= policy_match\n\
+    default_md= default\nunique_subject=no\n\
+    [ policy_match ]\ncountryName= match\nstateOrProvinceName= match\norganizationName= match\norganizationalUnitName= optional\n\
+    commonName= supplied\nemailAddress= optional\n">>/etc/ssl/openssl.cnf
 
 EXPOSE 389 636
 COPY entrypoint.sh init_openldap /bin/

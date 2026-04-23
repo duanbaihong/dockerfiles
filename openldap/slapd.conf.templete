@@ -144,13 +144,13 @@ logpurge 30+00:00 01+00:00
 overlay              unique
 unique_attributes    mail uidNumber
 
-overlay     syncprov
-syncprov-nopresent  TRUE
-syncprov-reloadhint TRUE
+#overlay     syncprov
+#syncprov-nopresent  TRUE
+#syncprov-reloadhint TRUE
 
 database    mdb
 maxsize     10737418240
-directory   @@LDAP_DATA_DIR@@/-+
+directory   @@LDAP_DATA_DIR@@/accesslog
 rootdn      "cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@"
 suffix      "cn=accesslog"
 index       default eq

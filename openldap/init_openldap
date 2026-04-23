@@ -77,7 +77,7 @@ function CreatCerts() {
     fi
     if [ ! -f "${LDAP_CONF_DIR}/certs/ca/dhparam.pem" ]; then
       formatOutput "Generating dhparam keyfile to [${LDAP_CONF_DIR}/certs/ca/dhparam.pem]..."
-      openssl dhparam -out ${LDAP_CONF_DIR}/certs/ca/dhparam.pem 4096 >/dev/null 2>&1
+      openssl dhparam -dsaparam -out ${LDAP_CONF_DIR}/certs/ca/dhparam.pem 4096 >/dev/null 2>&1
       printOK $?
     fi
     if [ ! -f "${LDAP_CONF_DIR}/certs/server/server.crt" ]; then

@@ -168,7 +168,7 @@ function init_config() {
   if [ ! -f "${LDAP_CONF_DIR}/slapd.conf" ]; then
     if [ "$LDAP_SSL" == "True" ]; then
       CreatCerts
-      LDAP_SSL_CONFIG="TLSCipherSuite          HIGH:MEDIUM:+SSLv2:+TLSv1:+SSLv3\nTLSCACertificateFile    ${LDAP_CONF_DIR}/certs/ca/ca.crt\nTLSCertificateFile      ${LDAP_CONF_DIR}/certs/server/server.crt\nTLSCertificateKeyFile   ${LDAP_CONF_DIR}/certs/server/server.key\n\nTLSDHParamFile          ${LDAP_CONF_DIR}/certs/ca/dhparam.pem\nTLSVerifyClient         ${LDAP_TLS_VERIFY_CLIENT}"
+      LDAP_SSL_CONFIG="TLSCipherSuite          HIGH:!aNULL:!MD5:!DES:!RC4:!SSLv2:!SSLv3:!TLSv1:!TLSv1.1\nTLSCACertificateFile    ${LDAP_CONF_DIR}/certs/ca/ca.crt\nTLSCertificateFile      ${LDAP_CONF_DIR}/certs/server/server.crt\nTLSCertificateKeyFile   ${LDAP_CONF_DIR}/certs/server/server.key\n\nTLSDHParamFile          ${LDAP_CONF_DIR}/certs/ca/dhparam.pem\nTLSVerifyClient         ${LDAP_TLS_VERIFY_CLIENT}"
     else
       formatOutput title
     fi

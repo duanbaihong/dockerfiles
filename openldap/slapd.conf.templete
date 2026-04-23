@@ -85,6 +85,8 @@ access to dn.subtree="cn=Monitor"
         by users read
         by * none
 
+sizelimit   5000
+
 database    config
 rootdn      "cn=root,cn=config"
 rootpw      @@LDAP_ROOT_PASSWORD_RSA@@

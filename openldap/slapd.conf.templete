@@ -74,6 +74,7 @@ access to *
    by self read
    by * none
 
+sizelimit   5000
 
 #######################################################################
 # MDB database definitions
@@ -85,7 +86,6 @@ access to dn.subtree="cn=Monitor"
         by users read
         by * none
 
-sizelimit   5000
 
 database    config
 rootdn      "cn=root,cn=config"

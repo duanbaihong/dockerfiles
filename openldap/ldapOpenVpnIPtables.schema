@@ -25,5 +25,5 @@ objectclass ( 1.3.6.1.4.1.7.1.2.2.1 NAME 'ldapOpenVpnIptables'
     SUP top
     AUXILIARY
     MUST ( cn $ iptableRoles )
-    MAY ( uniqueMember $ ou $ description )
+    MAY ( uniqueMember $ ou $ description $ isDefaultGroup)
     )

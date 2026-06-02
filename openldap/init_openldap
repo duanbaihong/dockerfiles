@@ -50,6 +50,7 @@ function help() {
   formatOutput " LDAP_ADMIN_USER=${LDAP_ADMIN_USER}" "User manager/add/del user.Defualt: admin"
   formatOutput " LDAP_ADMIN_PASSWORD=${LDAP_ADMIN_PASSWORD}" "Admin user password.Default: duanbai"
   formatOutput " LDAP_SYNC_USER=${LDAP_SYNC_USER}" "Sync user,Default: syncuser"
+  formatOutput " LDAP_SLAVE_RID=${LDAP_SLAVE_RID}" "Sync user,Default: 001"
   formatOutput " LDAP_SYNC_USERPASS=${LDAP_SYNC_USERPASS}" "Sync user password.Default: duanbai"
   formatOutput " LDAP_SYNC_SSL=${LDAP_SYNC_SSL}" "Enable Sync SSL.Default: True"
   formatOutput " LDAP_SYNC_PORT=${LDAP_SYNC_PORT}" "Sync from Master Port.Default: 389"

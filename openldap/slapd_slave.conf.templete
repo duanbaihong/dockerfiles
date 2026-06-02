@@ -136,20 +136,20 @@ refint_attributes    member memberof uniqueMember manager owner
 # syncprov-sessionlog  10000
 
 # syncrepl directives
-syncrepl rid=001
+# logbase="cn=accesslog"
+# logfilter="(&(objectClass=auditWriteObject)(reqResult=0))"
+# syncdata=accesslog
+syncrepl rid=@@LDAP_SLAVE_RID@@
     provider=@@LDAP_MASTER_ADDRESS@@:@@LDAP_SYNC_PORT@@
     bindmethod=simple
     binddn="cn=@@LDAP_SYNC_USER@@,ou=SystemUser,@@LDAP_SUFFIX@@"
     credentials=@@LDAP_SYNC_USERPASS@@
     searchbase="@@LDAP_SUFFIX@@"
-    logbase="cn=accesslog"
-    logfilter="(&(objectClass=auditWriteObject)(reqResult=0))"
-    schemachecking=on
+    schemachecking=off
     type=refreshAndPersist
     retry="5 10 60 +"
     scope=sub
     attrs="*,+"
-    syncdata=accesslog
     keepalive=60:10:30
     timeout=30
     @@LDAP_SLAVE_SSL_ARGS@@

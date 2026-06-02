@@ -15,6 +15,7 @@ ENV OPENLDAP_VERSION=2.6.0 \
     LDAP_ADMIN_USER=admin \
     LDAP_ADMIN_PASSWORD=duanbai \
     LDAP_SYNC_USER=syncuser \
+    LDAP_SLAVE_RID=001 \
     LDAP_SYNC_USERPASS=syncuser123 \
     LDAP_SYNC_SSL=True \
     LDAP_EMAIL=duanbaihong@qq.com \

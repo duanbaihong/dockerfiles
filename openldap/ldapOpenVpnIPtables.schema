@@ -13,10 +13,17 @@ attributetype ( 1.3.6.1.4.1.7.1.2.1.1 NAME 'iptableRoles'
     EQUALITY caseIgnoreMatch
     SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
 
+attributetype ( 1.3.6.1.4.1.7.1.2.1.2
+    NAME 'isDefaultGroup'
+    DESC 'Boolean: Default VPN Group (TRUE/FALSE)'
+    EQUALITY booleanMatch
+    SYNTAX 1.3.6.1.4.1.1466.115.121.1.7
+    SINGLE-VALUE )
+
 objectclass ( 1.3.6.1.4.1.7.1.2.2.1 NAME 'ldapOpenVpnIptables'
     DESC 'MANDATORY: ldapOpenVpnIptables objectclass'
-    SUP top 
+    SUP top
     AUXILIARY
-    MUST ( uniqueMember $ cn $ iptableRoles )
-    MAY (  ou $ description ) 
+    MUST ( cn $ iptableRoles )
+    MAY ( uniqueMember $ ou $ description )
     )

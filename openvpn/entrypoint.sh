@@ -8,7 +8,8 @@ ulimit -n 65535
 if [ ! -f "${OPENVPN_PREFIX}/etc/certs/ca/ca.crt" ] \
     || [ ! -f "${OPENVPN_PREFIX}/etc/certs/server/server.crt" ] \
     || [ ! -f "${OPENVPN_PREFIX}/etc/certs/server/server.key" ] \
-    || [ ! -f "${OPENVPN_PREFIX}/etc/certs/ca/dhparam.pem" ];then 
+    || [ ! -f "${OPENVPN_PREFIX}/etc/certs/ca/dhparam.pem" ] \
+    || [ ! -f "${OPENVPN_PREFIX}/etc/certs/ca/ta.key" ];then 
     mkdir ${OPENVPN_PREFIX}/etc/certs/ca \
     ${OPENVPN_PREFIX}/etc/certs/server \
     ${OPENVPN_PREFIX}/etc/certs/client \

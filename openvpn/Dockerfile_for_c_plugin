@@ -3,7 +3,7 @@ MAINTAINER dbh888<duanbaihong@qq.com>
 ARG OPENVPN_INSTALL=/opt/openvpn
 ENV EMAIL=duanbaihong@qq.com \
     OPENVPN_VERSION=2.7.5 \
-    OPENVPN_LDAP_PLUGIN_VERSION=1.0.7 \
+    OPENVPN_LDAP_PLUGIN_VERSION=1.0.8 \
     OPENVPN_PLUGINTYPE=c \
     OPENVPN_PROTO='tcp' \
     OPENVPN_PORT='1194' \
@@ -19,7 +19,7 @@ ENV EMAIL=duanbaihong@qq.com \
 ADD server.conf openvpn-timeformat.patch config.yaml entrypoint.sh init_openvpn ${OPENVPN_PREFIX}/example/
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
-    && installDeps='gcc make autoconf upx automake g++ linux-headers linux-pam-dev zlib-dev libc-utils lzo-dev lz4-dev openssl-dev libtool yaml-dev openssl-libs-static openldap-dev' \
+    && installDeps='gcc make autoconf upx py3-docutils patch automake g++ linux-headers linux-pam-dev pkcs11-helper-dev libcap-ng-dev libnl3-dev zlib-dev libc-utils lzo-dev lz4-dev openssl-dev libtool yaml-dev openssl-libs-static openldap-dev' \
     && appPkg='iptables sudo lzo lz4-libs libldap yaml bc openssl bash' \
     && apk add --no-cache ${installDeps} ${appPkg} \
     && cd /tmp/ \
@@ -30,10 +30,10 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && cd openvpn-$OPENVPN_VERSION \
     && autoreconf -i -v -f \
     && patch -p1 < ${OPENVPN_PREFIX}/example/openvpn-timeformat.patch \
+    && sed -i '1i #include <dlfcn.h>' src/plugins/auth-pam/auth-pam.c \
     && ./configure --prefix=${OPENVPN_PREFIX} \
-       --enable-static\
+       --enable-pkcs11\
        --enable-async-push \
-       --enable-iproute2 \
        --enable-pam-dlopen \
        OPENSSL_LIBS='-lssl -lcrypto'\
     && make install \
